@@ -1,0 +1,2257 @@
+{
+  "name": "Product Listing via XML API (Hood.de): Odoo -> marketplace with category tree, images, taxes",
+  "nodes": [
+    {
+      "parameters": {
+        "jsCode": "\nreturn $input.first().json.result;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -544,
+        16
+      ],
+      "id": "c4e9733f-8139-4e84-bf5e-3e596edb73a8",
+      "name": "get product info",
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "mode": "raw",
+        "jsonOutput": "{\n  \"odoo_api\": \"<REDACTED>\",\n  \"odoo_id_user_api\": 2,\n  \"odoo_url\": \"https://your-instance.example.com/jsonrpc\",\n  \"odoo_name_sql\": \"your_odoo_db\"\n}\n",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -1168,
+        16
+      ],
+      "id": "ce8743b1-8d20-4de8-80d0-77aac9738d27",
+      "name": "api odoo"
+    },
+    {
+      "parameters": {
+        "mode": "raw",
+        "jsonOutput": "={\n  \"HOOD_BASE_URL\": \"https://www.hood.de/api.htm\",\n  \"hood_user\": \"ACME AG\",\n  \"hood_password\": \"<REDACTED>\"\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -976,
+        16
+      ],
+      "id": "b40a8bcb-b088-4971-b473-7097636c3858",
+      "name": "API Seting HOOD"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('API Seting HOOD').item.json.HOOD_BASE_URL }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "text/xml; charset=UTF-8"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/xml; charset=utf-8",
+        "body": "=<api type=\"public\" version=\"2.0\" user=\"{{ $('API Seting HOOD').item.json.hood_user }}\" password=\"{{ $('API Seting HOOD').item.json.hood_password }}\">\n  <accountName>{{ $('API Seting HOOD').item.json.hood_user }}</accountName>\n  <accountPass>{{ $('API Seting HOOD').item.json.hood_password }}</accountPass>\n  <function>itemList</function>\n  <itemStatus>shopInventory</itemStatus>\n  <listMode>simple</listMode>\n  <startAt>1</startAt>\n  <groupSize>10</groupSize>\n</api>\n",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -1184,
+        -480
+      ],
+      "id": "37a014b4-cccf-4dbf-9eef-5cd79d43791a",
+      "name": "HOOD item"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('API Seting HOOD').item.json.HOOD_BASE_URL }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "text/xml; charset=UTF-8"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/xml; charset=utf-8",
+        "body": "=<api type=\"public\" version=\"2.0\" user=\"{{ $('API Seting HOOD').item.json.hood_user }}\" password=\"{{ $('API Seting HOOD').item.json.hood_password }}\">\n  <accountName>{{ $('API Seting HOOD').item.json.hood_user }}</accountName>\n  <accountPass>{{ $('API Seting HOOD').item.json.hood_password }}</accountPass>\n  <function>itemDetail</function>\n    <accountName>ACME AG</accountName>\n    <accountPass><SECRET></accountPass>\n    <itemID>{{ $json.itemID }}</itemID>\n</api>",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -784,
+        -480
+      ],
+      "id": "8fffd9ef-0313-4ebc-b888-d15f54a846d2",
+      "name": "HOOD item detail"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.xml",
+      "typeVersion": 1,
+      "position": [
+        -592,
+        -480
+      ],
+      "id": "90d294e8-c1bc-4aba-a38d-68472d46524e",
+      "name": "XML"
+    },
+    {
+      "parameters": {
+        "url": "https://www.hood.de/f/katDat.xml",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -256,
+        -464
+      ],
+      "id": "9786bdfa-78c8-497c-83da-743757dd6345",
+      "name": "HTTP Request"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.xml",
+      "typeVersion": 1,
+      "position": [
+        -64,
+        -464
+      ],
+      "id": "ae904884-5745-42f0-bd49-0656815ba901",
+      "name": "XML2"
+    },
+    {
+      "parameters": {
+        "jsCode": "const flatCategories = $input.first().json.categories.category;\n\n// 1. Отримаємо всі parentID — тобто ті, що мають дітей\nconst parentIDs = new Set(flatCategories.map(cat => cat.parentID));\n\n// 2. Фільтруємо лише кінцеві категорії (які самі не є parent'ами)\nconst leafCategories = flatCategories.filter(cat => !parentIDs.has(cat.categoryID));\n\n// 3. Побудова повного шляху для кожної leaf-категорії\nfunction getFullPath(category, map) {\n  const path = [category.categoryName];\n  let current = map.get(category.parentID);\n  while (current && current.categoryID !== current.parentID) {\n    path.unshift(current.categoryName);\n    current = map.get(current.parentID);\n  }\n  if (current) path.unshift(current.categoryName); // додаємо root\n  return path.join('/');\n}\n\n// 4. Створюємо Map для швидкого доступу по ID\nconst catMap = new Map(flatCategories.map(cat => [cat.categoryID, cat]));\n\n// 5. Повертаємо результат\nreturn leafCategories.map(cat => ({\n  categoryID: cat.categoryID,\n  full_path: getFullPath(cat, catMap)\n}));\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        112,
+        -464
+      ],
+      "id": "b4b11b95-16af-4599-b94b-9c53b61edd37",
+      "name": "All category"
+    },
+    {
+      "parameters": {
+        "jsCode": "for (const item of $input.all()) {\n  const xml = item.json.data;\n  const match = xml.match(/<itemID>(\\d+)<\\/itemID>/);\n  item.json.itemID = match ? match[1] : null;\n}\n\nreturn $input.all();\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -992,
+        -480
+      ],
+      "id": "de72fea7-dcbf-4701-8c85-65a88068310a",
+      "name": "Code product"
+    },
+    {
+      "parameters": {
+        "content": "# Get product",
+        "height": 200,
+        "width": 832,
+        "color": 4
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -1232,
+        -544
+      ],
+      "id": "c70716d4-e406-4128-9331-1268142728d4",
+      "name": "Sticky Note2"
+    },
+    {
+      "parameters": {
+        "content": "# Get all category",
+        "height": 200,
+        "width": 584,
+        "color": 4
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -288,
+        -544
+      ],
+      "id": "8554fede-5000-4d9b-8a6d-165251c0b6c9",
+      "name": "Sticky Note3"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        2304,
+        0
+      ],
+      "id": "bb7cc03e-faf7-4970-91c6-d46bc95b89c9",
+      "name": "Loop Over Items"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.xml",
+      "typeVersion": 1,
+      "position": [
+        1968,
+        0
+      ],
+      "id": "97ab430e-8734-41fc-8922-12be5299a40f",
+      "name": "XML1"
+    },
+    {
+      "parameters": {
+        "jsCode": "const total = $input.first().json.response.totalRecords;\nconst step = 1000;\nconst result = [];\n\nfor (let i = 0; i < total; i += step) {\n\tresult.push({ json: { startAt: i + 1 } });\n}\n\nreturn result;\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2128,
+        0
+      ],
+      "id": "1cb1f3bb-6e81-4b32-ad4c-8826b88f81e2",
+      "name": "startAt"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('API Seting HOOD').first().json.HOOD_BASE_URL }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "text/xml; charset=UTF-8"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/xml; charset=utf-8",
+        "body": "=<api type=\"public\" version=\"2.0\" user=\"{{ $('API Seting HOOD').first().json.hood_user }}\" password=\"{{ $('API Seting HOOD').first().json.hood_password }}\">\n  <accountName>{{ $('API Seting HOOD').first().json.hood_user }}</accountName>\n  <accountPass>{{ $('API Seting HOOD').first().json.hood_password }}</accountPass>\n<function>itemList</function>\n<itemStatus>shopInventory</itemStatus>\n<listMode>itemNumber</listMode>\n<startAt>{{ $json.startAt }}</startAt>\n<groupSize>1000</groupSize>\n</api>",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2544,
+        144
+      ],
+      "id": "f44034b8-1c35-42e8-8aa7-9b408e80dc74",
+      "name": "HOOD loop item"
+    },
+    {
+      "parameters": {
+        "jsCode": "const raw = $input.first().json.response.items.item;\n\n// Якщо один обʼєкт — обгортаємо його у масив\nconst items = Array.isArray(raw) ? raw : [raw];\n\nreturn items.map(i => ({\n  itemNumber: i.itemNumber\n}));\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2896,
+        144
+      ],
+      "id": "62e913b1-714e-4ffe-a52d-36772c15c010",
+      "name": "loop item"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.xml",
+      "typeVersion": 1,
+      "position": [
+        2720,
+        144
+      ],
+      "id": "eacc4d9b-2e09-4ccd-8c27-30032707baab",
+      "name": "XML3"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('API Seting HOOD').first().json.HOOD_BASE_URL }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "text/xml; charset=UTF-8"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/xml; charset=utf-8",
+        "body": "=<api type=\"public\" version=\"2.0\" user=\"{{ $('API Seting HOOD').first().json.hood_user }}\" password=\"{{ $('API Seting HOOD').first().json.hood_password }}\">\n  <accountName>{{ $('API Seting HOOD').first().json.hood_user }}</accountName>\n  <accountPass>{{ $('API Seting HOOD').first().json.hood_password }}</accountPass>\n<function>itemList</function>\n<itemStatus>shopInventory</itemStatus>\n<listMode>itemNumber</listMode>\n<startAt>1</startAt>\n<groupSize>100</groupSize>\n</api>",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1792,
+        0
+      ],
+      "id": "4c603a6a-421e-44ac-b162-757b4cb13113",
+      "name": "HOOD item1"
+    },
+    {
+      "parameters": {
+        "aggregate": "aggregateAllItemData",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.aggregate",
+      "typeVersion": 1,
+      "position": [
+        2512,
+        -160
+      ],
+      "id": "8e38a19f-889d-4f26-ae8c-fe99edfa1bb3",
+      "name": "Aggregate"
+    },
+    {
+      "parameters": {
+        "jsCode": "const data = $input.first().json.data;\n$('get product odoo').first().json.result[0].default_code\n\nconst defaultCode = $('get product odoo').first().json.result[0].default_code;\n\n\nconst result = data.map(item => {\n  const exists = String(item.itemNumber) === defaultCode;\n  return {\n    itemNumber: item.itemNumber,\n    found: exists\n  };\n});\n\n\nconst isAnyFound = result.some(item => item.found === true);\n\n// Вивід\nreturn [{ json: { canCreate: !isAnyFound } }];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2672,
+        -160
+      ],
+      "id": "9872b1ec-7a78-428b-a49f-aa3477aafcb7",
+      "name": "Can create"
+    },
+    {
+      "parameters": {
+        "content": "# Перевірка на наявність товару",
+        "height": 552,
+        "width": 1900
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        1776,
+        -224
+      ],
+      "id": "228bb6f1-d89e-4822-b822-35e12ffabc11",
+      "name": "Sticky Note4"
+    },
+    {
+      "parameters": {
+        "resource": "custom",
+        "customResource": "account.tax",
+        "operation": "getAll",
+        "limit": 1,
+        "options": {
+          "fieldsList": [
+            "id",
+            "name",
+            "amount",
+            "country_id",
+            "country_code",
+            "company_id"
+          ]
+        },
+        "filterRequest": {
+          "filter": [
+            {
+              "fieldName": "id",
+              "operator": "in",
+              "value": "={{ $('get product info').first().json.taxes_id }}"
+            },
+            {
+              "fieldName": "type_tax_use",
+              "value": "sale"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.odoo",
+      "typeVersion": 1,
+      "position": [
+        4704,
+        -192
+      ],
+      "id": "ecd00180-1f52-41ea-b1ad-8ebf065e8758",
+      "name": "get taxes",
+      "alwaysOutputData": true,
+      "credentials": {
+        "odooApi": {
+          "id": "",
+          "name": "YOUR_ODOOAPI_CREDENTIAL"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "custom",
+        "customResource": "x_auto_posting",
+        "operation": "update",
+        "customResourceId": "={{ $('Start').first().json.taskId }}",
+        "fieldsToCreateOrUpdate": {
+          "fields": [
+            {
+              "fieldName": "x_studio_stage_id",
+              "fieldValue": "={{ $json.id_stage }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.odoo",
+      "typeVersion": 1,
+      "position": [
+        3344,
+        -16
+      ],
+      "id": "07218be8-4559-4f46-89f5-f14b30d78e2f",
+      "name": "send error stage2",
+      "credentials": {
+        "odooApi": {
+          "id": "",
+          "name": "YOUR_ODOOAPI_CREDENTIAL"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "custom",
+        "customResource": "mail.message",
+        "fieldsToCreateOrUpdate": {
+          "fields": [
+            {
+              "fieldName": "model",
+              "fieldValue": "x_auto_posting"
+            },
+            {
+              "fieldName": "res_id",
+              "fieldValue": "={{ $('Start').first().json.taskId }}"
+            },
+            {
+              "fieldName": "message_type",
+              "fieldValue": "comment"
+            },
+            {
+              "fieldName": "subtype_id",
+              "fieldValue": "={{ 1 }}"
+            },
+            {
+              "fieldName": "body",
+              "fieldValue": "={{ $('status to forge error2').first().json.message }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.odoo",
+      "typeVersion": 1,
+      "position": [
+        3520,
+        -16
+      ],
+      "id": "a1fc3bca-d669-45fc-9dd3-10977ad0c23a",
+      "name": "send message problem2",
+      "credentials": {
+        "odooApi": {
+          "id": "",
+          "name": "YOUR_ODOOAPI_CREDENTIAL"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "\n\nlet message = $input.first().json.message;\n\nreturn [{\n  message: message,\n  id_stage: 4\n}]"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3184,
+        -16
+      ],
+      "id": "0573dbc7-5a6c-4d08-a6fb-ed3f9067a0e1",
+      "name": "status to forge error2"
+    },
+    {
+      "parameters": {
+        "jsCode": "const id = $input.first().json.id;\nconst item = $('get product info').first().json;\nconst taxName = $('get taxes').first().json.name || \"0%\";\nconst gpsr = $('Checks Level #2').first().json.gpsr_data || {};\nconst images = $('Final URLs').first().json || {};\nconst tagIds = item.product_tag_ids;\nconst infoIZS = $('Checks Level #2').first().json.infoIZS || null;\nconst allPrices = $('Get Prices').all().map(i => i.json);\n\nconst vat = parseFloat(taxName.replace(\"%\", \"\").trim()) || 0;\nconst price = String(item.list_price.toFixed(2));\nconst priceFI = (allPrices.find(i => i.pricelist_id[0] === 11)).fixed_price;\nconst priceAT = (allPrices.find(i => i.pricelist_id[0] === 7)).fixed_price;\n\nconst brand = $('Checks Level #1').first().json.brand;\nconst barcode = $('Checks Level #1').first().json.barcode;\n\nlet result = {\n  itemMode: \"shopProduct\",\n  itemName: item.x_studio_name_3,\n  description: item.x_studio_description_unique,\n  price,\n  listPrice: String((parseFloat(item.list_price) + 10).toFixed(2)),\n  quantity: item.dr_free_qty,\n  salesTax: String(vat.toFixed(2)),\n  brand,\n  condition: \"new\",\n  categoryID: id,\n  itemNumber: item.default_code,\n  barcode,\n  mpn: item.default_code,\n  manufacturer: item.x_studio_manufacturer_name,\n  payOptions: {\n    option: [\"hoodPay\"]\n  }\n};\n\n// Мапа скорочень країн\nconst countryCodes = {\n  \"Germany\": \"DE\",\n  \"Poland\": \"PL\",\n  \"Denmark\": \"DK\",\n  \"Spain\": \"ES\",\n  \"Netherlands\": \"NL\",\n  \"Belgium\": \"BE\",\n  \"Romania\": \"RO\",\n  \"France\": \"FR\",\n  \"Austria\": \"AT\",\n  \"Unknown\": \"XX\",\n  \"United Kingdom\": \"GB\",\n  \"Slovenia\": \"SI\",\n  \"Finland\": \"FI\",\n  \"USA\": \"US\"\n};\n\n// Додаємо GPSR-інформацію, якщо є\nif (gpsr.x_studio_eu_responsible_name) {\n  result.eu_responsible_name = gpsr.x_studio_eu_responsible_name;\n  result.eu_responsible_phone_number = gpsr.x_studio_eu_responsible_phone_number;\n  result.eu_responsible_email = gpsr.x_studio_eu_responsible_email;\n  const country = gpsr.x_studio_eu_responsible_country;\n  result.eu_responsible_country = countryCodes[country] || country || \"XX\";\n  result.eu_responsible_post_code = gpsr.x_studio_eu_responsible_post_code;\n  result.eu_responsible_town = gpsr.x_studio_eu_responsible_town;\n  result.eu_responsible_street = gpsr.x_studio_eu_responsible_street;\n  result.eu_responsible_house_no = gpsr.x_studio_eu_responsible_house_no;\n  result.manufacturer_name = gpsr.x_studio_manufacturer_name;\n}\n\n// Зображення\nlet allImages = [];\n\nif (images.main_img) {\n  result.MainImage = images.main_img;\n  allImages.push(`<imageURL>${images.main_img}</imageURL>`);\n}\n\nif (Array.isArray(images.additional_images) && images.additional_images.length > 0) {\n  result.additionalImages = images.additional_images;\n\n  images.additional_images.forEach(img => {\n    const url = typeof img === \"string\" ? img : img.url;\n    if (url) {\n      allImages.push(`<imageURL>${url}</imageURL>`);\n    }\n  });\n}\n\nresult.imageListXML = allImages.join('');\n\n// Додаємо атрибути розмірів тільки якщо вони > 0\nlet attributeXML = [];\n\nconst dimensions = {\n  weight: item.weight != false ? item.weight : 0,\n  length_value: item.feed_length != false ? item.feed_length : 0,\n  width: item.feed_width != false ? item.feed_width : 0,\n  height: item.feed_height != false ? item.feed_height : 0,\n  weight_unit: \"kg\",\n  unit: \"cm\"\n};\n\nif (+dimensions.length_value > 0) {\n  attributeXML.push(`<attribute><name>Length</name><value>${dimensions.length_value} ${dimensions.unit}</value></attribute>`);\n}\n\nif (+dimensions.width > 0) {\n  attributeXML.push(`<attribute><name>Width</name><value>${dimensions.width} ${dimensions.unit}</value></attribute>`);\n}\n\nif (+dimensions.height > 0) {\n  attributeXML.push(`<attribute><name>Height</name><value>${dimensions.height} ${dimensions.unit}</value></attribute>`);\n}\n\nif (+dimensions.weight > 0) {\n  result.weight = dimensions.weight;\n  result.unit = dimensions.weight_unit;\n}\n\n\nif (attributeXML.length > 0) {\n  result.attributes = {\n    attribute: attributeXML.join('')\n  };\n}\n\nfunction money(n) {\n  return Math.round(Number(n) * 100) / 100;\n}\n\nconst deltaEU = money(priceFI - price);\nconst deltaAT = money(priceAT - price);\n\nconst shipping_EU = tagIds.includes(9)\n  ? deltaEU\n  : money(deltaEU + 19.99);\n\nconst shipping_AT = tagIds.includes(9)\n  ? deltaAT\n  : money(deltaAT + 9.99);\n\nconst shipRules = {\n  small: [\n    { name: \"DHLsmallPacket_nat\", price: 4.99 },\n    { name: \"DHLsmallPacket_at\", price: shipping_AT },\n    { name: \"DPD_nat\", price: 4.99 },\n    { name: \"DPD_at\", price: shipping_AT },\n    { name: \"DHLPacket_eu\", price: shipping_EU },\n    { name: \"DHLPacket_int\", price: 50.00 }\n  ],\n  standard: [\n    { name: \"DHLPacket_nat\", price: 6.99 },\n    { name: \"DHLPacket_at\", price: shipping_AT },\n    { name: \"DPD_nat\", price: 6.99 },\n    { name: \"DPD_at\", price: shipping_AT },\n    { name: \"DHLPacket_eu\", price: shipping_EU },\n    { name: \"DHLPacket_int\", price: 50.00 }\n  ],\n  free: [\n    { name: \"DHLPacket_nat\", price: 0.00 },\n    { name: \"DHLPacket_at\", price: shipping_AT },\n    { name: \"DPD_nat\", price: 0.00 },\n    { name: \"DPD_at\", price: shipping_AT },\n    { name: \"DHLPacket_eu\", price: shipping_EU },\n    { name: \"DHLPacket_int\", price: 50.00 }\n  ],\n};\n\nlet shipmethods = [];\n\nswitch (true) {\n  case tagIds.includes(9):\n    shipmethods = shipRules.free;\n    break;\n\n  case tagIds.includes(2):\n    shipmethods = shipRules.standard;\n    break;\n\n  case tagIds.includes(1):\n    shipmethods = shipRules.small;\n    break;\n\n  default:\n    shipmethods = shipRules.standard; \n}\n\nlet shipmethodsXML = shipmethods\n  .map(sm => {\n    return `\n        <shipmethod name=\"${sm.name}\">\n          <value>${sm.price}</value>\n        </shipmethod>`;\n  })\n  .join(\"\");\n\nresult.shipmethodsXML = shipmethodsXML;\n\nif (infoIZS && infoIZS !== null) {\n  result.productInfoUrlXML = `<productInfoUrl>${infoIZS}</productInfoUrl>`;\n}\n\n\nreturn result;\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        5680,
+        -192
+      ],
+      "id": "d98e3db9-466f-448f-92f2-3302ce768229",
+      "name": "all product info"
+    },
+    {
+      "parameters": {
+        "jsCode": "const xmlRaw = $input.first().json.data || \"\";\nconst rawName = $('get product info').first().json.x_studio_name_3 || \"\";\n\n// Витягуємо itemID з XML\nconst itemIdMatch = xmlRaw.match(/<itemID>(\\d+)<\\/itemID>/);\nconst itemID = itemIdMatch ? itemIdMatch[1] : null;\n\n// Перевірка на помилку\nconst hasError = \n  xmlRaw.includes(\"<status>failed</status>\") || \n  xmlRaw.includes(\"<error>globalError</error>\") || \n  itemID === null;\n\n// Функція для створення slug із назви\nfunction slugify(text) {\n  return text\n    .replace(/\\\\/g, \"\")                        \n    .replace(/[\"'“”„‟″‶‷]/g, \"\")\n    .replace(/[()]/g, \"\")\n    .replace(/[-–—−]/g, \"\")\n    .replace(/,/g, \"\")\n    .toLowerCase()\n    .normalize(\"NFD\")\n    .replace(/[\\u0300-\\u036f]/g, \"\")\n    .replace(/ß/g, \"ss\")\n    .replace(/[^a-z0-9]+/g, \"-\")\n    .replace(/^-+|-+$/g, \"\")\n    .replace(/--+/g, \"-\");\n}\n\nconst slug = slugify(rawName);\n\n// Генеруємо URL\nconst hoodURL = itemID && slug ? `https://www.hood.de/i/${slug}-${itemID}.htm` : null;\n\n// Повертаємо\nreturn {\n  itemID,\n  slug,\n  hoodURL,\n  hasError\n};\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        6160,
+        -192
+      ],
+      "id": "a999d715-bd35-4fa1-b86e-397af85d4fe7",
+      "name": "URL listing"
+    },
+    {
+      "parameters": {
+        "resource": "custom",
+        "customResource": "x_auto_posting",
+        "operation": "update",
+        "customResourceId": "={{ $('Start').first().json.taskId }}",
+        "fieldsToCreateOrUpdate": {
+          "fields": [
+            {
+              "fieldName": "x_studio_url_listing",
+              "fieldValue": "={{ $json.hoodURL }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.odoo",
+      "typeVersion": 1,
+      "position": [
+        6576,
+        -64
+      ],
+      "id": "c6246557-6d62-498d-b580-81643f5f932c",
+      "name": "send url product",
+      "credentials": {
+        "odooApi": {
+          "id": "",
+          "name": "YOUR_ODOOAPI_CREDENTIAL"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('API Seting HOOD').first().json.HOOD_BASE_URL }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "text/xml; charset=UTF-8"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/xml; charset=utf-8",
+        "body": "=<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<api type=\"public\" version=\"2.0\" user=\"{{ $('API Seting HOOD').first().json.hood_user }}\" password=\"{{ $('API Seting HOOD').first().json.hood_password }}\">\n   <function>itemInsert</function>\n  <accountName>{{ $('API Seting HOOD').first().json.hood_user }}</accountName>\n  <accountPass>{{ $('API Seting HOOD').first().json.hood_password }}</accountPass>\n   <items>\n    <item>\n      <itemMode>shopProduct</itemMode>\n      <itemName><![CDATA[{{ $json.itemName }}]]></itemName>\n      <description><![CDATA[\n        {{ $json.description }}]]></description>\n      <price>{{ $json.price }}</price>\n      <listPrice>{{ $json.listPrice }}</listPrice>\n      <quantity>{{ $json.quantity }}</quantity>\n      <salesTax>{{ $json.salesTax }}</salesTax>\n      <condition>{{ $json.condition }}</condition>\n      <categoryID>{{ $json.categoryID }}</categoryID>\n      <itemNumber>{{ $json.itemNumber }}</itemNumber>\n      <manufacturer>{{ $json.brand }}</manufacturer>\n      <ean>{{ $json.barcode }}</ean>\n      <mpn>{{ $json.mpn }}</mpn>\n      <weight>{{ $json.weight }}</weight>\n      <images>{{ $json.imageListXML }}</images>\n      <payOptions>\n        <option>{{ $json.payOptions.option[0] }}</option>\n      </payOptions>\n      <shipmethods> {{ $json.shipmethodsXML }}\n      </shipmethods>\n      <attributes>\n        {{ $json.attributes.attribute }}\n      </attributes>\n      {{ $json.productInfoUrlXML }}\n      <productContactInformation>\n      <manufacturer>\n        <name><![CDATA[{{ $json.eu_responsible_name }}]]></name>\n        <street><![CDATA[{{ $json.eu_responsible_street }} {{ $json.eu_responsible_house_no }}]]></street>\n        <zip><![CDATA[{{ $json.eu_responsible_post_code }}]]></zip>\n        <city><![CDATA[Seelze]]></city>\n        <country2DigitCode><![CDATA[{{ $json.eu_responsible_country }}]]></country2DigitCode>\n        <phone><![CDATA[{{ $json.eu_responsible_phone_number }}]]></phone>\n        <email><![CDATA[{{ $json.eu_responsible_email }}]]></email>\n      </manufacturer>\n      <additionalContact>\n      <name><![CDATA[{{ $json.eu_responsible_name }}]]></name>\n        <street><![CDATA[{{ $json.eu_responsible_street }} {{ $json.eu_responsible_house_no }}]]></street>\n        <zip><![CDATA[{{ $json.eu_responsible_post_code }}]]></zip>\n        <city><![CDATA[{{ $json.eu_responsible_town }}]]></city>\n        <country2DigitCode><![CDATA[{{ $json.eu_responsible_country }}]]></country2DigitCode>\n        <phone><![CDATA[{{ $json.eu_responsible_phone_number }}]]></phone>\n        <email><![CDATA[{{ $json.eu_responsible_email }}]]></email>\n        </additionalContact>\n      </productContactInformation>\n    </item>\n  </items>\n</api>",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        5952,
+        -192
+      ],
+      "id": "3fd5759e-5962-4b58-afa1-8a5ec373f2c5",
+      "name": "Post product"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('api odoo').first().json.odoo_url }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json; charset=utf-8",
+        "body": "={\n    \"jsonrpc\": \"2.0\",\n    \"method\": \"call\",\n    \"params\": {\n        \"service\": \"object\",\n        \"method\": \"execute_kw\",\n        \"args\": [\n            \"{{ $('api odoo').first().json.odoo_name_sql }}\",\n            {{ $('api odoo').first().json.odoo_id_user_api }},\n            \"{{ $('api odoo').first().json.odoo_api }}\",\n            \"product.template\",\n            \"search_read\",\n            [ \n                [ \n                    [\"id\", \"=\", {{ $('Start').first().json.productId }}]\n                ] \n            ],\n            {\n                \"fields\": [\n                    \"is_published\",\n                    \"id\",\n                    \"default_code\",\n                    \"product_tag_ids\",\n                    \"x_studio_attachments\",\n                    \"list_price\",\n                    \"taxes_id\",\n                    \"standard_price\",\n                    \"dr_free_qty\",\n                    \"x_studio_name_3\",\n                    \"x_studio_description_unique\",\n                    \"base_unit_count\",\n                    \"base_unit_id\",\n                    \"categ_id\",\n                    \"x_studio_brand_name\",\n                    \"barcode\",\n                    \"x_studio_archive_barcode\",\n                    \"public_categ_ids\",\n                    \"seo_product_brand\",\n                    \"seo_product_gtin\",\n                    \"dr_free_qty\",\n                    \"seo_product_color\",\n                    \"seo_product_material\",\n                    \"product_template_image_ids\",\n                    \"weight\",\n                    \"x_studio_attributes\",\n                    \"feed_length\",\n                    \"feed_width\",\n                    \"feed_height\",\n                    \"feed_shipping_weight\",\n                    \"feed_shipping_length\",\n                    \"feed_shipping_width\",\n                    \"feed_shipping_height\",\n                    \"feed_color\",\n                    \"feed_material\",\n                    \"energy_efficiency_class\",\n                    \"x_studio_manufacturer_name\",\n                    \"x_studio_basic_quantity\",\n                    \"x_studio_basic_units\",\n                    \"name\",\n                    \"website_description\",\n                    \"x_studio_parent_sku\",\n                    \"x_studio_eu_responsible_name\",\n                    \"x_studio_eu_responsible_street\",\n                    \"x_studio_eu_responsible_house_no\",\n                    \"x_studio_eu_responsible_town\",\n                    \"x_studio_eu_responsible_post_code\",\n                    \"x_studio_eu_responsible_country\",\n                    \"x_studio_eu_responsible_email\",\n                    \"x_studio_eu_responsible_phone_number\",\n                    \"image_1920\"\n                ],\n                \"context\": {\n                    \"lang\": \"de_DE\"\n                }\n            }\n        ]\n    }\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -752,
+        16
+      ],
+      "id": "0dece248-c657-478b-8704-a02460eeb923",
+      "name": "get product odoo",
+      "retryOnFail": true
+    },
+    {
+      "parameters": {
+        "jsCode": "let result = $input.first().json.result;\n\n// Якщо масив категорій відсутній або порожній — одразу повертаємо false\nif (!result || !Array.isArray(result) || result.length === 0) {\n  return [{ categories_name: false }];\n}\n\n// Основна логіка\nlet categories_name = result\n  .map(item => ({\n    name: item.name,\n    parent_name: item.parent_id ? item.parent_id[1] : \"\",\n    prarents_and_self: item.parents_and_self,\n    length: item.parents_and_self?.length || 0\n  }))\n  .sort((a, b) => b.length - a.length)[0];\n\n// Якщо категорія не знайдена — теж повертаємо false\nif (!categories_name || !categories_name.name) {\n  return [{ categories_name: false }];\n}\n\n// Формуємо текст назви\nlet replace_name = result.find(f => f.parent_id === false)?.name + \" / \";\nlet final_name = categories_name.parent_name.replace(replace_name, \"\") + \" -> \" + categories_name.name;\n\n// Повертаємо фінальний результат\nreturn [{ categories_name: final_name || false }];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1200,
+        16
+      ],
+      "id": "0638a8c7-4d29-418b-b9a2-15056627d25b",
+      "name": "full categories de"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('api odoo').first().json.odoo_url }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json; charset=utf-8",
+        "body": "={\n    \"jsonrpc\": \"2.0\",\n    \"method\": \"call\",\n    \"params\": {\n        \"service\": \"object\",\n        \"method\": \"execute_kw\",\n        \"args\": [\n            \"{{ $('api odoo').first().json.odoo_name_sql }}\",\n            {{ $('api odoo').first().json.odoo_id_user_api }},\n            \"{{ $('api odoo').first().json.odoo_api }}\",\n            \"product.public.category\",\n            \"search_read\",\n            [ \n                [ \n                    [\"id\", \"in\", [{{ $('get product info').first().json.public_categ_ids }}]]\n                ] \n            ],\n            {\n                \"fields\": [\n                    \"id\",\n                    \"name\",\n                    \"parent_id\",\n                    \"parents_and_self\"\n                ],\n                \"context\": {\n                    \"lang\": \"de_DE\"\n                }\n            }\n        ]\n    }\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1008,
+        16
+      ],
+      "id": "9919e697-a7da-46c6-bbb5-49eb9b7b7281",
+      "name": "get categories de",
+      "retryOnFail": true
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "742e67d7-e8b5-4ad9-961a-2e51d1c01131",
+              "leftValue": "={{ $json.result[0].x_studio_attachments[0] }}",
+              "rightValue": "",
+              "operator": {
+                "type": "number",
+                "operation": "exists",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        544,
+        0
+      ],
+      "id": "5d4ee1dd-c9eb-44a3-8a63-5189d5b60cb6",
+      "name": "Check attachments"
+    },
+    {
+      "parameters": {
+        "resource": "custom",
+        "customResource": "x_description_images",
+        "operation": "getAll",
+        "limit": 1,
+        "options": {
+          "fieldsList": "={{ [\"x_studio_file_filename\",\"x_studio_file_pdf\", \"x_studio_file\"] }}"
+        },
+        "filterRequest": {
+          "filter": [
+            {
+              "fieldName": "id",
+              "value": "={{ $('get product info').first().json.x_studio_attachments }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.odoo",
+      "typeVersion": 1,
+      "position": [
+        784,
+        -128
+      ],
+      "id": "77a0a1d6-1141-4256-94fc-5c613cd337a0",
+      "name": "Attachments info",
+      "alwaysOutputData": true,
+      "retryOnFail": true,
+      "waitBetweenTries": 5000,
+      "credentials": {
+        "odooApi": {
+          "id": "",
+          "name": "YOUR_ODOOAPI_CREDENTIAL"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "inputSource": "passthrough"
+      },
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        -1376,
+        16
+      ],
+      "id": "25eb2210-159b-4e0a-9e56-03ca9aece6b0",
+      "name": "Start"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "b4f44743-f195-4000-b410-e40dbbf0f907",
+              "leftValue": "={{ $json.total_check }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1552,
+        16
+      ],
+      "id": "9fe21bdc-38e0-44d6-8082-91bb0f3c4e9b",
+      "name": "check total"
+    },
+    {
+      "parameters": {
+        "resource": "custom",
+        "customResource": "x_auto_posting",
+        "operation": "update",
+        "customResourceId": "={{ $('Start').first().json.taskId }}",
+        "fieldsToCreateOrUpdate": {
+          "fields": [
+            {
+              "fieldName": "x_studio_stage_id",
+              "fieldValue": "={{ $json.id_stage }}"
+            },
+            {
+              "fieldName": "x_studio_error_reasons",
+              "fieldValue": "={{ $json.reason }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.odoo",
+      "typeVersion": 1,
+      "position": [
+        960,
+        240
+      ],
+      "id": "d10a86aa-3ba9-4b70-81c7-4802f1adb83c",
+      "name": "send error stage5",
+      "retryOnFail": true,
+      "credentials": {
+        "odooApi": {
+          "id": "",
+          "name": "YOUR_ODOOAPI_CREDENTIAL"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "custom",
+        "customResource": "mail.message",
+        "fieldsToCreateOrUpdate": {
+          "fields": [
+            {
+              "fieldName": "model",
+              "fieldValue": "x_auto_posting"
+            },
+            {
+              "fieldName": "res_id",
+              "fieldValue": "={{ $('Start').first().json.taskId }}"
+            },
+            {
+              "fieldName": "message_type",
+              "fieldValue": "comment"
+            },
+            {
+              "fieldName": "subtype_id",
+              "fieldValue": "={{ 1 }}"
+            },
+            {
+              "fieldName": "body",
+              "fieldValue": "={{ $('status to forge error').first().json.message }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.odoo",
+      "typeVersion": 1,
+      "position": [
+        1136,
+        240
+      ],
+      "id": "d9bfc11c-24bb-4079-a71c-a877019d2523",
+      "name": "send message problem",
+      "retryOnFail": true,
+      "credentials": {
+        "odooApi": {
+          "id": "",
+          "name": "YOUR_ODOOAPI_CREDENTIAL"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const input = $input.first().json;\n\nreturn [{\n  message: input.message,\n  id_stage: 4,\n  reason: input.reason\n}]"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        768,
+        240
+      ],
+      "id": "2d75450d-6f8f-47e1-9a1a-b2fd1b3e237f",
+      "name": "status to forge error"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "7248d2c8-21f5-4b80-940b-2fa6bd32753e",
+              "leftValue": "={{ $json.message }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notExists",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        304,
+        16
+      ],
+      "id": "8c660933-ad92-45d7-8f7f-4ab7ded1f5ea",
+      "name": "Check Errors"
+    },
+    {
+      "parameters": {
+        "jsCode": "const product = $('get product info').first().json;\n\nconst main_img = \"https://your-instance.example.com/web/image/product.template/\" + product.id + \"/image_1920\";\n\nconst additional_images = product.product_template_image_ids.map(item => {\n  const link = \"https://your-instance.example.com/web/image/product.image/\" + item + \"/image_1920\";\n  return link\n});\n\n// const img2 = additional_images[0];\n// const img3 = additional_images[1];\n\nreturn {main_img, additional_images};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        4176,
+        -192
+      ],
+      "id": "39f866bc-5d51-4eb1-a123-3e83734dfd14",
+      "name": "Get images is_published true"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "06c41c6e-7e06-4dda-bb2b-dc0ab32816ba",
+              "leftValue": "={{ $('get product info').first().json.is_published }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        3792,
+        -176
+      ],
+      "id": "ffac4bd0-d3f0-4a63-b16a-805ba939e29a",
+      "name": "is_published true"
+    },
+    {
+      "parameters": {
+        "jsCode": "return $input.all();"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        4496,
+        -192
+      ],
+      "id": "e2498a80-5737-4c17-a627-b0ff06d7729e",
+      "name": "Final URLs"
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "Kemz2y75sfW4kkwu",
+          "mode": "list",
+          "cachedResultUrl": "/workflow/<WORKFLOW_ID>",
+          "cachedResultName": "Get AWS Images"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "product_id": "={{ $('Start').first().json.productId }}"
+          },
+          "matchingColumns": [
+            "product_id"
+          ],
+          "schema": [
+            {
+              "id": "product_id",
+              "displayName": "product_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "number",
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        4064,
+        16
+      ],
+      "id": "c5aefd0d-4537-48d0-81c3-00075438438f",
+      "name": "Create Images on AWS"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "06f3f630-a249-4180-a28c-1fc8343c3b03",
+              "name": "main_img",
+              "value": "={{ $json.main_image_url }}",
+              "type": "string"
+            },
+            {
+              "id": "930a1d1b-4432-4887-8a82-e82a551f1ab0",
+              "name": "additional_images",
+              "value": "={{ $json.additional_images_urls }}",
+              "type": "array"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        4288,
+        16
+      ],
+      "id": "d6355b28-9e5b-4bc0-a72f-7861f1ca955f",
+      "name": "Set URLs"
+    },
+    {
+      "parameters": {
+        "content": "# Create URL fo Images",
+        "height": 544,
+        "width": 976,
+        "color": 6
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        3696,
+        -224
+      ],
+      "typeVersion": 1,
+      "id": "5e6ff963-cb46-45b9-81dc-b11a78b3fa0c",
+      "name": "Sticky Note11"
+    },
+    {
+      "parameters": {
+        "jsCode": "const product = $('get product info').first().json;\nconst name = product.x_studio_name_3;\nconst description = product.x_studio_description_unique;\nconst manufacturerNameRaw  = \n      product.x_studio_manufacturer_name || product.x_studio_brand_name;\nconst sku = product.default_code;\n\nif (!name) {\n  return {\n    reason: \"Bad Fields\",\n    message: \"Відсутнє поле 'x_studio_name_3' назва товару\"\n  }\n}\n\n\nif (name && name.length < 10) {\n  return {\n    reason: \"Bad Fields\",\n    message: \"Поле 'x_studio_name_3' занадто коротке (менше 10 символів)\"\n  }\n}\n\nif (name && name.length > 85) {\n  return {\n    reason: \"Bad Fields\",\n    message: \"Поле 'x_studio_name_3' перевищує 85 символів\"\n  }\n}\n\nif (!description) {\n  return {\n    reason: \"Bad Fields\",\n    message: \"Відсутнє поле 'x_studio_description_unique' опис товару\"\n  }\n}\n\nif (description && description.length > 5000) {\n  return {\n    reason: \"Bad Fields\",\n    message: \"Поле 'x_studio_description_unique' перевищує 5000 символів\"\n  }\n}\n\nif (description && description.length < 10) {\n  return {\n    reason: \"Bad Fields\",\n    message: \"Поле 'x_studio_description_unique' занадто коротке (менше 10 символів)\"\n  }\n}\n\nlet barcode = \"\";\nif (product.barcode && product.barcode !== \"\" && product.barcode.length === 13) {\n  barcode = product.barcode;\n} else if (product.x_studio_archive_barcode && product.x_studio_archive_barcode !== \"\" && product.x_studio_archive_barcode.length === 13) {\n  barcode = product.x_studio_archive_barcode;\n} else if (product.seo_product_gtin && product.seo_product_gtin !== \"\" && product.seo_product_gtin.length === 13) {\n  barcode = product.seo_product_gtin;\n} else {\n  return {\n    reason: \"No Barcode\",\n    message: \"Відсутній баркод товару\"\n  };\n}\n\nconst price = product.list_price;\nif (price == null || price === false || price <= 0) {\n  return {\n    reason: \"No Sale Price\",\n    message: \"Відсутня або некоректна ціна товару\"\n  };\n}\n\nconst allowBrands = [\n  \"ICH-ZAPFE\", \"KLASEBO\", \"SKU-SHOP\", \"CELLFAST\", \"RAINBIRD\", \"KWB\", \"GREEN-SPLIT\", \"Weekiss\", \n  \"HAPPY PEOPLE\", \"DRESSELHAUS\", \"SKU-SHOP\", \"NATUREN\", \"TESA\", \"SCHUMACHER\", \"CARSYSTEM\", \"SCHUTZ\",\n  \"NICE\", \"BUHLER\", \"VOSSCHEMIE\", \"YACHTCARE\", \"Caramella\", \"Casadeco\", \"Texdecor\", \"Kidsdepot\", \"Coming Kids\",\n  \"Egmont Toys\", \"Happy Horse\", \"just dutch\", \"Le Toy Van\", \"Folkmanis\", \"Mathy by Bols\", \"Mr Maria\", \"3 Sprouts\", \n  \"Elements for Kids\", \"Bink Bedding\", \"Buokids\", \"Romina\", \"Sebra\", \"Sirch\", \"Snurk\", \"Superliving\", \"ALL CARE\",\n  \"ARTUR GLÖCKLER GmbH\", \"BETEC\", \"PROTEC Germany\", \"BEVI-CLEAN\", \"BROUWLAND\", \"CIS\", \"DMT\", \"DSI\", \"DISPTEK Group\", \n  \"FELOM\", \"Franz Matthes GmbH\", \"Thonhauser GmbH\", \"FUCHS\", \"GasTech GmbH\", \"GGV Handelsgesellschaft\", \"GLORIA GmbH\",\n  \"Iberian Coppers Lda\", \"JUNG\", \"LINDR \", \"MICRO MATIC\", \"MISA\", \"Oxyturbo\", \"ProfiGast\", \"RICK & JULICH\", \n  \"SARO Gastro-Products GmbH\", \"SCHÄFER Produkte GmbH\", \"Stölzle Lausitz GmbH\", \"TeeSA Web GmbH & Co KG\", \"UBC\",\n  \"Wecomatic\", \"HN Kernstützen Metallwaren GmbH Thüringen\", \"HBW Handel\", \"GARDEN STEEL\"\n];\n\nconst ACME = [\n  \"BRYZA\",\n  \"ACME®\",\n  \"Cepex\",\n  \"Cellfast\",\n  \"Sobime\",\n  \"Cell Fast\",\n  \"Hase Safety Gloves GmbH\",\n  \"Rain Bird\",\n  \"FIXAFLEX\",\n  \"Geli GmbH\",\n  \"KWB\",\n  \"Beckmann&Brehm\",\n  \"DOKAS\",\n  \"Zill\",\n  \"Cordes\",\n  \"Cook King\",\n  \"nmc Deutschland GmbH\",\n  \"NMC\",\n  \"COYOTTO GARDEN POTS\",\n  \"Brandenburg Späne\",\n  \"Pipetec GmbH\",\n  \"Happy People GmbH & Co. KG\",\n  \"BB-Verpackungen GmbH\",\n  \"CORDES GmbH & Co.KG\",\n  \"Dresselhaus\",\n  \"ecoon\",\n  \"ACME Brands\",\n  \"acme\",\n  \"BGS\",\n  \"Rasenspecht\",\n  \"Quedlinburger Saatgut GmbH\",\n  \"Quedlinburger\",\n  \"Naturen\",\n  \"Celaflor\",\n  \"Tesa\",\n  \"Kurt Europe\",\n  \"TFP Sp. z o.o.\",\n  \"Schumacher PL\",\n  \"Netbox\",\n  \"Mayer Network GmbH\",\n  \"Substral\",\n  \"DJUX\",\n  \"Karl Verpackungen\",\n  \"KM\",\n  \"Heumüller Holzwolle\",\n  \"Kompackt61\",\n  \"RRK\",\n  \"Kraftfixx\",\n  \"MATADOR’S BBQ Smoking Chips\",\n  \"Papier Kurz\",\n  \"MD Securepack\",\n  \"Nexa\",\n  \"PaperWise NL\",\n  \"Induplast\",\n  \"Lincar\",\n  \"MAALDERIJ ROOSENS\",\n  \"Buhl Paperform\",\n  \"Garant Verlag\",\n  \"Nuevopak GmbH\",\n  \"4iQ Group sp. z o.o.\"\n];\n\n\nconst manufacturerName = String(manufacturerNameRaw || '').trim();\n\nconst isValid = manufacturerName !== '' && manufacturerName !== '0';\n\nif (!isValid) {\n  return {\n    reason: \"Bad Fields\",\n    message: \"Бренд відсутній, або має невалідне значення\"\n  }\n}\n\nif (sku.startsWith(\"WF-\")) {\n  return {\n    brand: \"WESTFALIA\",\n    barcode\n  };\n}\n\nif (ACME(b => b.toLowerCase()).includes(manufacturerName.toLowerCase())) {\n  return {\n    brand: \"SKU-SHOP\",\n    barcode\n  };\n}\n\nconst normalizedInput = manufacturerName\n  .toLowerCase()\n  .replace(/[®©™]/g, '')\n  .replace(/\\s+/g, '')\n  .replace(/-/g, '');\n\nconst normalizedAllowBrands = allowBrands.map(original => ({\n  original,\n  normalized: original\n    .toLowerCase()\n    .trim()\n    .replace(/[®©™]/g, '')\n    .replace(/\\s+/g, '')\n    .replace(/-/g, '')\n}));\n\nconst matchedBrand = normalizedAllowBrands.find(b =>\n  b.normalized.includes(normalizedInput) || normalizedInput.includes(b.normalized)\n);\n\nif (!matchedBrand) {\n  return {\n    reason: \"Forbidden Brand\",\n    message: \"Бренд не відповідає дозволеному списку брендів\"\n  }\n}\n\nconst brand = matchedBrand.original;\n\nreturn { brand, barcode };"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        128,
+        16
+      ],
+      "id": "f986d031-a0f8-41b0-9efc-4f0320feda1a",
+      "name": "Checks Level #1"
+    },
+    {
+      "parameters": {
+        "jsCode": "const product = $('get product info').first().json;\n\n// Отримуємо назву категорії (з попереднього кроку)\nconst categories_name = $input.first().json.categories_name;\n\n// --- Спроба отримати PDF файл (безпечно) ---\nlet pdf_file = null;\nlet infoIZS = null;\ntry {\n  // Перевіряємо, чи існує нода та чи є в ній дані\n  const attachmentNode = $('Attachments info').first();\n  if (attachmentNode && attachmentNode.json) {\n    pdf_file = attachmentNode.json.x_studio_file || null;\n    infoIZS = attachmentNode.json.x_studio_file_pdf || null;\n  }\n} catch (e) {\n  // Якщо нода не спрацювала або її немає - просто ігноруємо, pdf_file залишиться null\n  console.log(\"Attachments info missing or failed\");\n}\n\nconst tags = product.product_tag_ids || [];\nconst Image = product.image_1920;\n\nconst deliveryTags = [1, 2, 3, 4, 5, 6, 7, 8, 9];\nconst hasDeliveryTag = tags.some(tag => deliveryTags.includes(tag));\n\nlet output = {\n  product_tag_ids: tags,\n  categories_name: categories_name,\n  dr_free_qty: product.dr_free_qty,\n  check_delivery_tags: hasDeliveryTag,\n  check_chemistry: true,\n  check_image: Image !== false && Image != null,\n  check_stock: product.dr_free_qty > 0,\n  // eu_responsible_name: product.x_studio_eu_responsible_name,\n  // eu_responsible_phone_number: product.x_studio_eu_responsible_phone_number,\n  // eu_responsible_email: product.x_studio_eu_responsible_email,\n  // eu_responsible_country: product.x_studio_eu_responsible_country,\n  // eu_responsible_post_code: product.x_studio_eu_responsible_post_code,\n  // eu_responsible_town: product.x_studio_eu_responsible_town,\n  // eu_responsible_street: product.x_studio_eu_responsible_street,\n  // eu_responsible_house_no: product.x_studio_eu_responsible_house_no,\n  manufacturer_name: product.x_studio_manufacturer_name,\n  is_published: product.is_published,\n  x_studio_gpsr_image: product.x_studio_gpsr_image,\n  x_studio_file: pdf_file, // <-- Додали PDF у вивід\n  infoIZS\n};\n\n// --- Перевірка тегів доставки ---\nif (!hasDeliveryTag) {\n  output.message = \"немає доставки\";\n  output.reason = \"No Delivery Tag\";\n}\n\n// --- Заборонені теги ---\nconst forbiddenTags = [241, 307];\nconst hasForbiddenTag = tags.some(tag => forbiddenTags.includes(tag));\n\nif (hasForbiddenTag) {\n  output.message = \"В товаре указан тег запрещающий к листингу на МП\";\n  output.reason = \"Not For Marketplaces\";\n}\n\n// --- Категорія хімії (НОВА ЛОГІКА) ---\n// Якщо категорія Хімія (7)\nif (product.categ_id && product.categ_id[0] === 7) {\n  // Якщо PDF є, ми пропускаємо цей блок (товар вважається валідним)\n  // Якщо PDF немає (!pdf_file), то блокуємо\n  if (!pdf_file) {\n    output.check_chemistry = false;\n    output.message = \"Товар находится в категории химия (возможно биоцид)/ не листим (Нет PDF)\";\n    output.reason = \"Not For Marketplaces\";\n  }\n}\n\n// --- Перевірка головного зображення ---\nif (Image === false || Image == null) {\n  output.check_image = false;\n  output.message = \"Главная картинка не существует\";\n  output.reason = \"Bad Fields\";\n}\n\n// --- Перевірка наявності категорії (через categories_name) ---\nif (!categories_name || categories_name === false) {\n  output.message = \"Нет категории в товара\";\n  output.reason = \"Bad Fields\";\n}\n\n// --- Перевірка стоку ---\nif (!output.check_stock) {\n  output.message = \"товара нет на стоке\";\n  output.reason = \"Stock Is Unavailable\";\n}\n\n// --- Перевірка GPSR ---\nlet gpsr_bad_fields = [];\nlet check_gpsr = true;\n\nconst gpsr_data = {\n  x_studio_eu_responsible_name: product.x_studio_eu_responsible_name,\n  x_studio_eu_responsible_phone_number: product.x_studio_eu_responsible_phone_number,\n  x_studio_eu_responsible_email: product.x_studio_eu_responsible_email,\n  x_studio_eu_responsible_country: product.x_studio_eu_responsible_country,\n  x_studio_eu_responsible_post_code: product.x_studio_eu_responsible_post_code,\n  x_studio_eu_responsible_town: product.x_studio_eu_responsible_town,\n  x_studio_eu_responsible_street: product.x_studio_eu_responsible_street,\n  x_studio_eu_responsible_house_no: product.x_studio_eu_responsible_house_no,\n  x_studio_manufacturer_name: product.x_studio_manufacturer_name,\n  x_studio_gpsr_image: product.x_studio_gpsr_image\n};\n\nfor (const [key, value] of Object.entries(gpsr_data)) {\n  if (\n    value === false ||\n    value === \"\" ||\n    value === \"0\" ||\n    value === 0 ||\n    value === \"-\" ||\n    (typeof value === \"string\" && value.toLowerCase() === \"#n/a\") || \n    (typeof value === \"string\" && value.toLowerCase() === \"n/a\")\n  ) {\n    gpsr_bad_fields.push(key); \n    check_gpsr = false;\n  }\n}\n\n\noutput.check_gpsr = check_gpsr;\n\nif (!check_gpsr) {\n  output.message = \"Данные по ГПСР не полные\";\n  output.reason = \"No GPSR\";\n  output.gpsr_bad_fields = gpsr_bad_fields;\n}\n\n// --- Загальна перевірка ---\nlet total_check = [\n  check_gpsr,\n  output.check_image,\n  output.check_chemistry, // Тепер це true, якщо це Хімія + є PDF\n  hasDeliveryTag,\n  categories_name && categories_name !== false,\n  output.check_stock\n].every(s => s === true);\n\nreturn [{\n  ...output,\n  gpsr_data,\n  total_check: total_check\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1360,
+        16
+      ],
+      "id": "15e63c96-d9f1-4805-b07b-d7a0e81296d1",
+      "name": "Checks Level #2"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "1e8ac998-73c1-44b3-8125-cce549520ab0",
+              "name": "message",
+              "value": "={{ $json.message }}",
+              "type": "string"
+            },
+            {
+              "id": "6ebdd18e-accc-4a1e-b3dd-df5023ef3509",
+              "name": "reason",
+              "value": "={{ $json.reason }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        608,
+        240
+      ],
+      "id": "d77e251a-88f3-43f6-9c7d-f5e72f4f061c",
+      "name": "Set Message"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "1e8ac998-73c1-44b3-8125-cce549520ab0",
+              "name": "message",
+              "value": "Товар уже присутній на маркетплейсі.",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        3024,
+        -16
+      ],
+      "id": "bd13fa01-5527-41d1-94ff-b318f8456670",
+      "name": "Set Message #2"
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "LgpHIBvNfw2YMQ9U",
+          "mode": "list",
+          "cachedResultUrl": "/workflow/<WORKFLOW_ID>",
+          "cachedResultName": "[Hood.de ACME] Get Categories"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        5232,
+        -192
+      ],
+      "id": "4df7c5c3-ce8a-44fe-a717-7cd2508229da",
+      "name": "Get Categories"
+    },
+    {
+      "parameters": {
+        "resource": "custom",
+        "customResource": "x_auto_posting",
+        "operation": "update",
+        "customResourceId": "={{ $('Start').first().json.taskId }}",
+        "fieldsToCreateOrUpdate": {
+          "fields": [
+            {
+              "fieldName": "x_studio_stage_id",
+              "fieldValue": "={{ $json.id_stage }}"
+            },
+            {
+              "fieldName": "x_studio_error_reasons",
+              "fieldValue": "Bad Fields"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.odoo",
+      "typeVersion": 1,
+      "position": [
+        5424,
+        96
+      ],
+      "id": "102bd2c4-22df-429c-a21d-67e27b7943b6",
+      "name": "send error stage3",
+      "credentials": {
+        "odooApi": {
+          "id": "",
+          "name": "YOUR_ODOOAPI_CREDENTIAL"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "cec5d4d1-8d30-4198-a7d4-f6b661ce6da4",
+              "leftValue": "={{ $json.id }}",
+              "rightValue": "",
+              "operator": {
+                "type": "dateTime",
+                "operation": "exists",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        5408,
+        -192
+      ],
+      "id": "105fd29d-a478-4708-ab1d-86baa1948bc4",
+      "name": "If Category Ok"
+    },
+    {
+      "parameters": {
+        "resource": "custom",
+        "customResource": "mail.message",
+        "fieldsToCreateOrUpdate": {
+          "fields": [
+            {
+              "fieldName": "model",
+              "fieldValue": "x_auto_posting"
+            },
+            {
+              "fieldName": "res_id",
+              "fieldValue": "={{ $('Start').first().json.taskId }}"
+            },
+            {
+              "fieldName": "message_type",
+              "fieldValue": "comment"
+            },
+            {
+              "fieldName": "subtype_id",
+              "fieldValue": "={{ 1 }}"
+            },
+            {
+              "fieldName": "body",
+              "fieldValue": "={{ $('Get Categories').first().json.message }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.odoo",
+      "typeVersion": 1,
+      "position": [
+        5648,
+        96
+      ],
+      "id": "59e76149-5d37-4ad5-8f49-d09f914ffe37",
+      "name": "send message problem3",
+      "retryOnFail": true,
+      "credentials": {
+        "odooApi": {
+          "id": "",
+          "name": "YOUR_ODOOAPI_CREDENTIAL"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "custom",
+        "customResource": "x_auto_posting",
+        "operation": "update",
+        "customResourceId": "={{ $('Start').first().json.taskId }}",
+        "fieldsToCreateOrUpdate": {
+          "fields": [
+            {
+              "fieldName": "x_studio_stage_id",
+              "fieldValue": "={{ 3 }}"
+            },
+            {
+              "fieldName": "x_studio_add_from_api",
+              "fieldValue": "={{ true }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.odoo",
+      "typeVersion": 1,
+      "position": [
+        6752,
+        -64
+      ],
+      "id": "f473b397-03e2-4e08-b718-b8b7168d2f79",
+      "name": "send active stage",
+      "credentials": {
+        "odooApi": {
+          "id": "",
+          "name": "YOUR_ODOOAPI_CREDENTIAL"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "5cf4fd02-fa93-4fe2-b528-1d91485cc857",
+              "leftValue": "={{ $json.canCreate }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        2832,
+        -160
+      ],
+      "id": "82f5ece9-4869-4028-911a-2ec442439808",
+      "name": "If Can Create"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "fc5e139a-04ea-4b6b-a14e-a35af4fcbbb4",
+              "leftValue": "={{ $json.hasError }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        6368,
+        -192
+      ],
+      "id": "e553cf8f-c717-479a-bc27-68ad1d1d4b27",
+      "name": "If Has Error"
+    },
+    {
+      "parameters": {
+        "errorMessage": "Помилка від Hood.de"
+      },
+      "type": "n8n-nodes-base.stopAndError",
+      "typeVersion": 1,
+      "position": [
+        6576,
+        -288
+      ],
+      "id": "718ac885-634c-4db8-8a86-30fee0846e7c",
+      "name": "Has Error"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "9fe9794c-e5aa-43c3-be5b-56dc16990e6a",
+              "name": "productId",
+              "value": "={{ $('Start').first().json.productId }}",
+              "type": "number"
+            },
+            {
+              "id": "78b52afc-d1fe-4ead-8219-afce297f351b",
+              "name": "shop_category",
+              "value": "={{ $('full categories de').first().json.categories_name }}",
+              "type": "string"
+            },
+            {
+              "id": "e71a4e89-4f1e-45ea-ad5c-bf37b54e360a",
+              "name": "main_img",
+              "value": "={{ $('Final URLs').first().json.main_img }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        5056,
+        -192
+      ],
+      "id": "1558db30-a294-4edd-bea2-e1e056967d6d",
+      "name": "Set Fields",
+      "executeOnce": true
+    },
+    {
+      "parameters": {
+        "resource": "custom",
+        "customResource": "product.pricelist.item",
+        "operation": "getAll",
+        "returnAll": true,
+        "options": {
+          "fieldsList": [
+            "pricelist_id",
+            "currency_id",
+            "fixed_price",
+            "name",
+            "product_tmpl_id"
+          ]
+        },
+        "filterRequest": {
+          "filter": [
+            {
+              "fieldName": "pricelist_id",
+              "operator": "in",
+              "value": "={{ [7, 11] }}"
+            },
+            {
+              "fieldName": "product_tmpl_id",
+              "value": "={{ $('Start').first().json.productId }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.odoo",
+      "typeVersion": 1,
+      "position": [
+        4880,
+        -192
+      ],
+      "id": "4a01dfcc-9f68-4dfe-8f20-3d74169942ca",
+      "name": "Get Prices",
+      "alwaysOutputData": true,
+      "executeOnce": true,
+      "credentials": {
+        "odooApi": {
+          "id": "",
+          "name": "YOUR_ODOOAPI_CREDENTIAL"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "d6dbfd91-da7f-4b52-a0bb-c7540323d263",
+              "leftValue": "={{ $json }}",
+              "rightValue": "",
+              "operator": {
+                "type": "object",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -336,
+        16
+      ],
+      "id": "f9329f43-2dbe-4f64-a74e-7ad9f074115b",
+      "name": "If Result"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "d1cafd76-0d9d-43bb-9c0b-23fe9859e6c0",
+              "name": "message",
+              "value": "Товар не найден в Оду",
+              "type": "string"
+            },
+            {
+              "id": "ac3083f4-0ea4-4686-afb0-afc35b48f6b4",
+              "name": "reason",
+              "value": "Manually Deactivated",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -128,
+        240
+      ],
+      "id": "f4411c84-272d-4899-a053-d75d59b16f62",
+      "name": "Message"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "1e664501-a9a6-474e-92ce-303a9a46263b",
+              "leftValue": "={{ $json.default_code }}",
+              "rightValue": "WF-",
+              "operator": {
+                "type": "string",
+                "operation": "startsWith"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -112,
+        16
+      ],
+      "id": "42ee16ff-f902-4164-a570-33668e52ff71",
+      "name": "If Westfalia"
+    },
+    {
+      "parameters": {
+        "resource": "custom",
+        "customResource": "x_auto_posting",
+        "operation": "update",
+        "customResourceId": "={{ $('Start').first().json.taskId }}",
+        "fieldsToCreateOrUpdate": {
+          "fields": [
+            {
+              "fieldName": "x_studio_stage_id",
+              "fieldValue": "={{ 8 }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.odoo",
+      "typeVersion": 1,
+      "position": [
+        128,
+        -208
+      ],
+      "id": "4b5fe64a-a1fd-4c0c-8501-f68794ce34a9",
+      "name": "send test stage",
+      "retryOnFail": true,
+      "credentials": {
+        "odooApi": {
+          "id": "",
+          "name": "YOUR_ODOOAPI_CREDENTIAL"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "get product info": {
+      "main": [
+        [
+          {
+            "node": "If Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "api odoo": {
+      "main": [
+        [
+          {
+            "node": "API Seting HOOD",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "API Seting HOOD": {
+      "main": [
+        [
+          {
+            "node": "get product odoo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HOOD item": {
+      "main": [
+        [
+          {
+            "node": "Code product",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HOOD item detail": {
+      "main": [
+        [
+          {
+            "node": "XML",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request": {
+      "main": [
+        [
+          {
+            "node": "XML2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "XML2": {
+      "main": [
+        [
+          {
+            "node": "All category",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code product": {
+      "main": [
+        [
+          {
+            "node": "HOOD item detail",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Over Items": {
+      "main": [
+        [
+          {
+            "node": "Aggregate",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "HOOD loop item",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "XML1": {
+      "main": [
+        [
+          {
+            "node": "startAt",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "startAt": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HOOD loop item": {
+      "main": [
+        [
+          {
+            "node": "XML3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "loop item": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "XML3": {
+      "main": [
+        [
+          {
+            "node": "loop item",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HOOD item1": {
+      "main": [
+        [
+          {
+            "node": "XML1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Aggregate": {
+      "main": [
+        [
+          {
+            "node": "Can create",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Can create": {
+      "main": [
+        [
+          {
+            "node": "If Can Create",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "get taxes": {
+      "main": [
+        [
+          {
+            "node": "Get Prices",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "send error stage2": {
+      "main": [
+        [
+          {
+            "node": "send message problem2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "status to forge error2": {
+      "main": [
+        [
+          {
+            "node": "send error stage2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "all product info": {
+      "main": [
+        [
+          {
+            "node": "Post product",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "URL listing": {
+      "main": [
+        [
+          {
+            "node": "If Has Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "send url product": {
+      "main": [
+        [
+          {
+            "node": "send active stage",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Post product": {
+      "main": [
+        [
+          {
+            "node": "URL listing",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "get product odoo": {
+      "main": [
+        [
+          {
+            "node": "get product info",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "get categories de": {
+      "main": [
+        [
+          {
+            "node": "full categories de",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check attachments": {
+      "main": [
+        [
+          {
+            "node": "Attachments info",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "get categories de",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Attachments info": {
+      "main": [
+        [
+          {
+            "node": "get categories de",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "full categories de": {
+      "main": [
+        [
+          {
+            "node": "Checks Level #2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Start": {
+      "main": [
+        [
+          {
+            "node": "api odoo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "check total": {
+      "main": [
+        [
+          {
+            "node": "HOOD item1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Set Message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "send error stage5": {
+      "main": [
+        [
+          {
+            "node": "send message problem",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "send message problem": {
+      "main": [
+        []
+      ]
+    },
+    "status to forge error": {
+      "main": [
+        [
+          {
+            "node": "send error stage5",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Errors": {
+      "main": [
+        [
+          {
+            "node": "Check attachments",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Set Message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get images is_published true": {
+      "main": [
+        [
+          {
+            "node": "Final URLs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "is_published true": {
+      "main": [
+        [
+          {
+            "node": "Get images is_published true",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Create Images on AWS",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Images on AWS": {
+      "main": [
+        [
+          {
+            "node": "Set URLs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set URLs": {
+      "main": [
+        [
+          {
+            "node": "Final URLs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Checks Level #1": {
+      "main": [
+        [
+          {
+            "node": "Check Errors",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Checks Level #2": {
+      "main": [
+        [
+          {
+            "node": "check total",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set Message": {
+      "main": [
+        [
+          {
+            "node": "status to forge error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Final URLs": {
+      "main": [
+        [
+          {
+            "node": "get taxes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set Message #2": {
+      "main": [
+        [
+          {
+            "node": "status to forge error2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Categories": {
+      "main": [
+        [
+          {
+            "node": "If Category Ok",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If Category Ok": {
+      "main": [
+        [
+          {
+            "node": "all product info",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "send error stage3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "send error stage3": {
+      "main": [
+        [
+          {
+            "node": "send message problem3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If Can Create": {
+      "main": [
+        [
+          {
+            "node": "is_published true",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Set Message #2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If Has Error": {
+      "main": [
+        [
+          {
+            "node": "Has Error",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "send url product",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set Fields": {
+      "main": [
+        [
+          {
+            "node": "Get Categories",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Prices": {
+      "main": [
+        [
+          {
+            "node": "Set Fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If Result": {
+      "main": [
+        [
+          {
+            "node": "If Westfalia",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Message": {
+      "main": [
+        [
+          {
+            "node": "Set Message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If Westfalia": {
+      "main": [
+        [
+          {
+            "node": "send test stage",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Checks Level #1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": false
+  }
+}

@@ -1,0 +1,651 @@
+{
+  "name": "AI Category Selection: two-step LLM (OpenAI + Grok) with manual fallback via Google Sheets",
+  "nodes": [
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "<SPREADSHEET_ID>",
+          "mode": "list",
+          "cachedResultName": "Hood category",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/<SPREADSHEET_ID>/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Лист1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/<SPREADSHEET_ID>/edit#gid=0"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.6,
+      "position": [
+        -2208,
+        64
+      ],
+      "id": "1a7bd2f4-0683-4d5a-b6bf-382d6410f935",
+      "name": "Hood categy",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "",
+          "name": "YOUR_GOOGLESHEETSOAUTH2API_CREDENTIAL"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\n\nconst result = items.map(el => {\n  return {\n    id: el.json.categoryID,\n    name: el.json.full_path\n  };\n});\n\nreturn [{ json: { categories: result } }];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -2000,
+        64
+      ],
+      "id": "4a410b73-f429-4345-a748-32007d4047d6",
+      "name": "Hood All category"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=This is my category from the shop:\n{{ $('Start').first().json.shop_category }}\n\nWe also have the product name: \n{{ $('get product odoo').first().json.result[0].x_studio_name_2 }}. \n\nAnd description of the product: \n{{ $('get product odoo').first().json.result[0].x_studio_description_unique }}. \n\nAnd the main picture of the product:\n{{ $('Start').first().json.main_img }}\n\nYou need to select the most suitable category from Hood.de for this product.\nCategories Hood.de: \n{{ $('Hood All category').first().json.categories.map(c => `• ${c.id} - ${c.name}`).join('\\n') }}.\n\nWaiting for a response, category ID, name of category\n\n\n\n",
+        "hasOutputParser": true,
+        "options": {
+          "systemMessage": "You are a category manager of a marketplace, your task is to select the right category for a product in the hood.de marketplace."
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 2,
+      "position": [
+        -1808,
+        64
+      ],
+      "id": "64ec4ef4-83b8-4a75-9d37-cec784ff2d4b",
+      "name": "define category"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "ffa417ee-02b0-48bb-aeb3-0b49f76fb130",
+              "leftValue": "={{ $json.output.id }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "exists",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -1488,
+        64
+      ],
+      "id": "6900ce34-b678-41f8-ba55-f03cceceb861",
+      "name": "Gave category"
+    },
+    {
+      "parameters": {
+        "jsonSchemaExample": "{\n\t\"id\": \"123123\",\n\t\"category_name\": \"category_name\"\n}"
+      },
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "typeVersion": 1.3,
+      "position": [
+        -1200,
+        512
+      ],
+      "id": "7180d12f-3dca-48aa-9097-3a123e3d6b1e",
+      "name": "Structured Output Parser category"
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "value": "o3-mini-2025-01-31",
+          "mode": "list",
+          "cachedResultName": "o3-mini-2025-01-31"
+        },
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.2,
+      "position": [
+        -832,
+        512
+      ],
+      "id": "4ff7446b-2897-4652-8eac-b42fe5d9f375",
+      "name": "OpenAI Chat Model",
+      "credentials": {
+        "openAiApi": {
+          "id": "",
+          "name": "YOUR_OPENAIAPI_CREDENTIAL"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "<SPREADSHEET_ID>",
+          "mode": "list",
+          "cachedResultName": "Hood category",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/<SPREADSHEET_ID>/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 1489325151,
+          "mode": "list",
+          "cachedResultName": "Лист2",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/<SPREADSHEET_ID>/edit#gid=1489325151"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.6,
+      "position": [
+        -1296,
+        176
+      ],
+      "id": "cc494a71-baf7-4c8e-9f41-d50595631f6e",
+      "name": "Hood categy1",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "",
+          "name": "YOUR_GOOGLESHEETSOAUTH2API_CREDENTIAL"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\n\nconst result = items.map(el => {\n  return {\n    id: el.json.categoryID,\n    name: el.json.full_path\n  };\n});\n\nreturn [{ json: { categories: result } }];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1120,
+        176
+      ],
+      "id": "657c43c4-cd4e-4553-b7fe-253486fc95fa",
+      "name": "Hood All category1"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=These are my categories from the shop:\n{{ $('Start').first().json.shop_category }}\n\nWe also have the product name:\n{{ $('get product odoo').first().json.result[0].x_studio_name_2 }}. \n\nAnd description of the product: \n{{ $('get product odoo').first().json.result[0].x_studio_description_unique }}. \n\nAnd the main picture of the product: \n{{ $('Start').first().json.main_img }}. \n\nYou need to select the most suitable category from Hood.de for this product.\nCategories Hood.de: \n{{ $('Hood All category1').first().json.categories.map(c => `• ${c.id} - ${c.name}`).join('\\n') }}.\n\nWaiting for a response, category ID, name of category\n\n\n\n",
+        "hasOutputParser": true,
+        "options": {
+          "systemMessage": "You are a category manager of a marketplace, your task is to select the right category for a product in the hood.de marketplace."
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 2,
+      "position": [
+        -928,
+        176
+      ],
+      "id": "14a84bca-6a1b-429c-b826-4f7632180117",
+      "name": "define category1"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "ffa417ee-02b0-48bb-aeb3-0b49f76fb130",
+              "leftValue": "={{ $json.output.id }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "exists",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -608,
+        176
+      ],
+      "id": "8c357103-4add-443f-a247-239d14a20e78",
+      "name": "Gave category1"
+    },
+    {
+      "parameters": {
+        "jsCode": "const data = $input.first().json.output;\nreturn {\n  id: data.id,\n};\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -896,
+        -64
+      ],
+      "id": "1ccdb882-6057-4ab1-a24e-542eda0506c2",
+      "name": "Category id"
+    },
+    {
+      "parameters": {
+        "jsCode": "const data = $input.first().json.output;\nreturn {\n  id: data.id,\n};\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -400,
+        64
+      ],
+      "id": "d71d4254-d17e-4850-8832-cfcddbd23187",
+      "name": "Category id1"
+    },
+    {
+      "parameters": {
+        "jsCode": "const data = $input.first().json;\n\nreturn {\n  id: data.id\n};\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -192,
+        -176
+      ],
+      "id": "806e5407-7c80-4ec1-87dc-1c2a77b15f3b",
+      "name": "Main category"
+    },
+    {
+      "parameters": {
+        "jsCode": "const product = $('get product odoo').first().json;\nconst textToCheck = (product.name || \"\") + \" \" + (product.category_name || \"\");\n\nif ((product.name || \"\").includes(\"Weekiss\")) {\n  return {\n    id: 20802 \n  };\n}\n\nconst gardenKeywords = [\n  \"Rasenkantenband\",\n  \"Rasenkanten\",\n  \"Beeteinfassung\",\n  \"Beetumrandung\",\n  \"Beetbegrenzungen\"\n];\nif (gardenKeywords.some(word => textToCheck.includes(word))) {\n  return {\n    id: 22578 \n  };\n}\n\nconst drinkKeywords = [\n  \"Bierzapfen\",\n  \"Bierkühler\",\n  \"Zapfanlage\",\n  \"Durchlaufkühler\",\n  \"Trockenkühler\"\n];\nif (drinkKeywords.some(word => textToCheck.includes(word))) {\n  return {\n    id: 16142 \n  };\n}\n\nconst glassCategoryMap = {\n  \"Cocktailgläser\": 14560,\n  \"Longdrinkgläser\": 14564,\n  \"Schnapsgläser\": 14569,\n  \"Sektgläser\": 14568,\n  \"Weingläser\": 14571,\n  \"Whiskygläser\": 14572\n};\nfor (const [keyword, categoryId] of Object.entries(glassCategoryMap)) {\n  if (textToCheck.includes(keyword)) {\n    return {\n      id: categoryId \n    };\n  }\n}\n\nif (textToCheck.includes(\"Shaker\")) {\n  return {\n    id: 12347\n  };\n}\n\nconst pourKeywords = [\"Portionierer\", \"Ausgießer\", \"Flaschenausschank\"];\nif (pourKeywords.some(word => textToCheck.includes(word))) {\n  return {\n    id: 16117\n  };\n}\n\n// Якщо нічого не підійшло\nreturn {id: 0 };\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -2608,
+        -160
+      ],
+      "id": "dc4b05be-53b1-4104-a331-eece30546e13",
+      "name": "Manual category"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "0c984cd2-fae1-4b0e-99f9-fc462ba0c924",
+              "leftValue": "={{ $json.id }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "notEquals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -2384,
+        -160
+      ],
+      "id": "9cf504f3-cf93-4281-849a-1619a1aa4f24",
+      "name": "Has a category"
+    },
+    {
+      "parameters": {
+        "inputSource": "passthrough"
+      },
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        -3264,
+        -160
+      ],
+      "id": "610ac4c4-a094-49e9-bd9a-b2fbd0c84e7f",
+      "name": "Start"
+    },
+    {
+      "parameters": {
+        "jsCode": "\n\nreturn [{\n  message: \"Не удалось подобрать категорию или проблемма с ИИ\",\n  id_stage: 7\n}]"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -384,
+        304
+      ],
+      "id": "d1961650-ec53-4abf-83d8-513d819ac3f2",
+      "name": "status to forge error"
+    },
+    {
+      "parameters": {
+        "mode": "raw",
+        "jsonOutput": "{\n  \"odoo_api\": \"<REDACTED>\",\n  \"odoo_id_user_api\": 2,\n  \"odoo_url\": \"https://your-instance.example.com/jsonrpc\",\n  \"odoo_name_sql\": \"your_odoo_db\"\n}\n",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -3040,
+        -160
+      ],
+      "id": "aa39ae28-c679-42fb-a2ae-2ba9326614c5",
+      "name": "api odoo"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('api odoo').first().json.odoo_url }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json; charset=utf-8",
+        "body": "={\n    \"jsonrpc\": \"2.0\",\n    \"method\": \"call\",\n    \"params\": {\n        \"service\": \"object\",\n        \"method\": \"execute_kw\",\n        \"args\": [\n            \"{{ $('api odoo').first().json.odoo_name_sql }}\",\n            {{ $('api odoo').first().json.odoo_id_user_api }},\n            \"{{ $('api odoo').first().json.odoo_api }}\",\n            \"product.template\",\n            \"search_read\",\n            [ \n                [ \n                    [\"id\", \"=\", {{ $('Start').first().json.productId }}]\n                ] \n            ],\n            {\n                \"fields\": [\n                    \"is_published\",\n                    \"id\",\n                    \"default_code\",\n                    \"product_tag_ids\",\n                    \"x_studio_attachments\",\n                    \"list_price\",\n                    \"taxes_id\",\n                    \"standard_price\",\n                    \"dr_free_qty\",\n                    \"x_studio_name_2\",\n                    \"x_studio_description_unique\",\n                    \"base_unit_count\",\n                    \"base_unit_id\",\n                    \"categ_id\",\n                    \"x_studio_brand_name\",\n                    \"barcode\",\n                    \"x_studio_archive_barcode\",\n                    \"public_categ_ids\",\n                    \"seo_product_brand\",\n                    \"seo_product_gtin\",\n                    \"dr_free_qty\",\n                    \"seo_product_color\",\n                    \"seo_product_material\",\n                    \"product_template_image_ids\",\n                    \"weight\",\n                    \"x_studio_attributes\",\n                    \"feed_length\",\n                    \"feed_width\",\n                    \"feed_height\",\n                    \"feed_shipping_weight\",\n                    \"feed_shipping_length\",\n                    \"feed_shipping_width\",\n                    \"feed_shipping_height\",\n                    \"feed_color\",\n                    \"feed_material\",\n                    \"energy_efficiency_class\",\n                    \"x_studio_manufacturer_name\",\n                    \"x_studio_basic_quantity\",\n                    \"x_studio_basic_units\",\n                    \"name\",\n                    \"website_description\",\n                    \"x_studio_parent_sku\",\n                    \"x_studio_eu_responsible_name\",\n                    \"x_studio_eu_responsible_street\",\n                    \"x_studio_eu_responsible_house_no\",\n                    \"x_studio_eu_responsible_town\",\n                    \"x_studio_eu_responsible_post_code\",\n                    \"x_studio_eu_responsible_country\",\n                    \"x_studio_eu_responsible_email\",\n                    \"x_studio_eu_responsible_phone_number\",\n                    \"image_1920\"\n                ],\n                \"context\": {\n                    \"lang\": \"de_DE\"\n                }\n            }\n        ]\n    }\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -2800,
+        -160
+      ],
+      "id": "262878f6-5704-41fe-9a4c-3d658cd8747d",
+      "name": "get product odoo",
+      "retryOnFail": true
+    },
+    {
+      "parameters": {
+        "model": "grok-4-fast-reasoning",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatXAiGrok",
+      "typeVersion": 1,
+      "position": [
+        -1408,
+        528
+      ],
+      "id": "d1f6a902-0c4a-4d50-adf7-82ad8843cf32",
+      "name": "xAI Grok Chat Model",
+      "credentials": {
+        "xAiApi": {
+          "id": "",
+          "name": "YOUR_XAIAPI_CREDENTIAL"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Hood categy": {
+      "main": [
+        [
+          {
+            "node": "Hood All category",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Hood All category": {
+      "main": [
+        [
+          {
+            "node": "define category",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "define category": {
+      "main": [
+        [
+          {
+            "node": "Gave category",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gave category": {
+      "main": [
+        [
+          {
+            "node": "Category id",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Hood categy1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Structured Output Parser category": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "define category",
+            "type": "ai_outputParser",
+            "index": 0
+          },
+          {
+            "node": "define category1",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Chat Model": {
+      "ai_languageModel": [
+        []
+      ]
+    },
+    "Hood categy1": {
+      "main": [
+        [
+          {
+            "node": "Hood All category1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Hood All category1": {
+      "main": [
+        [
+          {
+            "node": "define category1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "define category1": {
+      "main": [
+        [
+          {
+            "node": "Gave category1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gave category1": {
+      "main": [
+        [
+          {
+            "node": "Category id1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "status to forge error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Category id": {
+      "main": [
+        [
+          {
+            "node": "Main category",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Category id1": {
+      "main": [
+        [
+          {
+            "node": "Main category",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Manual category": {
+      "main": [
+        [
+          {
+            "node": "Has a category",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Has a category": {
+      "main": [
+        [
+          {
+            "node": "Main category",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Hood categy",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "status to forge error": {
+      "main": [
+        []
+      ]
+    },
+    "api odoo": {
+      "main": [
+        [
+          {
+            "node": "get product odoo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Start": {
+      "main": [
+        [
+          {
+            "node": "api odoo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "get product odoo": {
+      "main": [
+        [
+          {
+            "node": "Manual category",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "xAI Grok Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "define category",
+            "type": "ai_languageModel",
+            "index": 0
+          },
+          {
+            "node": "define category1",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": false
+  }
+}

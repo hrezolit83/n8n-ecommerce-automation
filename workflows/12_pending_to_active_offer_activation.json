@@ -1,0 +1,1920 @@
+{
+  "name": "Pending -> Active: create offers for LIVE products, poll import status, update Odoo stages",
+  "nodes": [
+    {
+      "parameters": {
+        "url": "={{ $json.baseUrl }}/api/mcm/products/sources/status/export",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "shop_id",
+              "value": "={{ $json.shop_ids }}"
+            },
+            {
+              "name": "provider_unique_identifier",
+              "value": "={{ $('get items odoo').first().json.result[0].default_code.startsWith('SKU-') ? $('get items odoo').first().json.result[0].default_code.replace('SKU-', '') : $('get items odoo').first().json.result[0].default_code }}"
+            }
+          ]
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "={{ $json.apiKey }}"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        512,
+        608
+      ],
+      "id": "be36e429-41aa-409c-b4a2-6c3dcc18aa49",
+      "name": "product listed?",
+      "retryOnFail": true,
+      "waitBetweenTries": 5000,
+      "alwaysOutputData": true,
+      "executeOnce": false,
+      "notesInFlow": false,
+      "maxTries": 5
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "5445d35a-9215-49ce-b6e3-123652c74fd2",
+              "leftValue": "={{ $json.statusCode }}",
+              "rightValue": "={{ 204 }}",
+              "operator": {
+                "type": "number",
+                "operation": "notEquals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        656,
+        608
+      ],
+      "id": "05d4e603-dc42-40b4-a183-4f83ebc7c009",
+      "name": "check listed?"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $json.odoProdUrl }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n    \"jsonrpc\": \"2.0\",\n    \"method\": \"call\",\n    \"params\": {\n        \"service\": \"object\",\n        \"method\": \"execute_kw\",\n        \"args\": [\n            \"{{ $json.odoo_name_prod_sql }}\",\n            \"{{ $json.odoo_id_user_api }}\",\n            \"{{ $json.odoo_api }}\",\n            \"product.template\",\n            \"search_read\",\n            [\n                [\n                    [\"id\", \"=\", {{ $json.productId }}]\n                ]\n            ],\n            {\n                \"fields\": [\n                  \"default_code\",\n                  \"barcode\",\n                  \"x_studio_plenty_id\"\n                ]\n            }\n        ]\n    }\n}\n ",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        160,
+        608
+      ],
+      "id": "0969f77d-0b5e-4a8a-97a1-81f5f0aa7cc4",
+      "name": "get items odoo",
+      "retryOnFail": true,
+      "waitBetweenTries": 4000
+    },
+    {
+      "parameters": {
+        "mode": "raw",
+        "jsonOutput": "={\n  \"odoo_id_user_api\": 2,\n  \"odoo_api\": \"<REDACTED>\",\n\n  \"odoo_name_prod_sql\": \"your_odoo_db\",\n  \"odoProdUrl\": \"https://your-instance.example.com/jsonrpc\",\n\n  \"odoo_name_fresh_data_sql\": \"acme\",\n  \"odoFreshDataUrl\": \"https://your-instance.example.com/jsonrpc\",\n\n  \"odoStageUrl\": \"https://your-instance.example.com/jsonrpc\",\n  \"odoo_name_posting_sql\": \"acme\",\n  \"odooImagesUrs\": \"https://your-instance.example.com/\",\n  \"odooMainImageUrl\": \"https://your-instance.example.com/web/image/product.template/\",\n  \"odooSecondImageUrl\": \"https://your-instance.example.com/web/image/product.image/\",\n  \"productId\": \"{{ $('Перебор всех продуктов').item.json.productId }}\"\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -32,
+        608
+      ],
+      "id": "01cc3edd-4e08-437b-9fae-29d692756cf9",
+      "name": "Set params Odoo"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "63ed1510-86dc-4b33-98b1-2da334074ae1",
+              "name": "website_id",
+              "value": "={{ [95, 96, 97, 98, 126] }}",
+              "type": "array"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -1280,
+        64
+      ],
+      "id": "66aef4dc-d7c1-4ceb-ad89-f563cd1179b9",
+      "name": "List ids"
+    },
+    {
+      "parameters": {
+        "resource": "custom",
+        "customResource": "x_auto_posting",
+        "operation": "getAll",
+        "limit": 1000,
+        "options": {
+          "fieldsList": [
+            "id",
+            "x_studio_website",
+            "x_studio_product",
+            "x_studio_stage_id"
+          ]
+        },
+        "filterRequest": {
+          "filter": [
+            {
+              "fieldName": "x_studio_stage_id",
+              "value": "={{ 6 }}"
+            },
+            {
+              "fieldName": "x_studio_website",
+              "value": "={{ $json.website_id }}"
+            },
+            {
+              "fieldName": "x_studio_url_listing"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.odoo",
+      "typeVersion": 1,
+      "position": [
+        -1104,
+        64
+      ],
+      "id": "632c8b88-fba7-4f42-a8f8-42699a93d926",
+      "name": "Get pending product",
+      "alwaysOutputData": true,
+      "credentials": {
+        "odooApi": {
+          "id": "",
+          "name": "YOUR_ODOOAPI_CREDENTIAL"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "raw",
+        "jsonOutput": "={\n  \"productId\": {{ $json.x_studio_product[0] }},\n  \"taskId\": {{ $json.id }}\n} ",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -720,
+        64
+      ],
+      "id": "a7b3158c-cc78-4949-b6e7-aac59f0f9680",
+      "name": "product id"
+    },
+    {
+      "parameters": {
+        "fieldToSplitOut": "productId",
+        "include": "selectedOtherFields",
+        "fieldsToInclude": "taskId",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [
+        -320,
+        64
+      ],
+      "id": "c63aa798-5d53-4bd7-aed3-a6426e9a63e5",
+      "name": "Split Out"
+    },
+    {
+      "parameters": {
+        "batchSize": "=1",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        -32,
+        240
+      ],
+      "id": "aa1c6398-217c-4ee0-806a-22bdc05a4daf",
+      "name": "Перебор всех продуктов"
+    },
+    {
+      "parameters": {
+        "resource": "custom",
+        "customResource": "mail.message",
+        "fieldsToCreateOrUpdate": {
+          "fields": [
+            {
+              "fieldName": "model",
+              "fieldValue": "x_auto_posting"
+            },
+            {
+              "fieldName": "res_id",
+              "fieldValue": "={{ $('Loop Over Items1').first().json.taskId }}"
+            },
+            {
+              "fieldName": "message_type",
+              "fieldValue": "comment"
+            },
+            {
+              "fieldName": "subtype_id",
+              "fieldValue": "={{ 1 }}"
+            },
+            {
+              "fieldName": "body",
+              "fieldValue": "Товар успешно залищен со статусом \"LIVE\" market: Leroy Merlin | ACME"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.odoo",
+      "typeVersion": 1,
+      "position": [
+        2528,
+        720
+      ],
+      "id": "ffd9f15b-770b-409e-aa17-b78dcf7c67e5",
+      "name": "send message1",
+      "retryOnFail": true,
+      "credentials": {
+        "odooApi": {
+          "id": "",
+          "name": "YOUR_ODOOAPI_CREDENTIAL"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "custom",
+        "customResource": "mail.message",
+        "fieldsToCreateOrUpdate": {
+          "fields": [
+            {
+              "fieldName": "model",
+              "fieldValue": "x_auto_posting"
+            },
+            {
+              "fieldName": "res_id",
+              "fieldValue": "={{ $('Loop Over Items2').first().json.taskId }}"
+            },
+            {
+              "fieldName": "message_type",
+              "fieldValue": "comment"
+            },
+            {
+              "fieldName": "subtype_id",
+              "fieldValue": "={{ 1 }}"
+            },
+            {
+              "fieldName": "body",
+              "fieldValue": "Товар не залищен на Adeo (Leroy Merli | ACME), повторно отправлен  в New task Stage"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.odoo",
+      "typeVersion": 1,
+      "position": [
+        544,
+        1104
+      ],
+      "id": "844e4db7-3e9f-4ff0-aad7-d35a0a6257db",
+      "name": "product not listed",
+      "retryOnFail": true,
+      "credentials": {
+        "odooApi": {
+          "id": "",
+          "name": "YOUR_ODOOAPI_CREDENTIAL"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "custom",
+        "customResource": "mail.message",
+        "fieldsToCreateOrUpdate": {
+          "fields": [
+            {
+              "fieldName": "model",
+              "fieldValue": "x_auto_posting"
+            },
+            {
+              "fieldName": "res_id",
+              "fieldValue": "={{ $('Loop Over Items3').first().json.taskId }}"
+            },
+            {
+              "fieldName": "message_type",
+              "fieldValue": "comment"
+            },
+            {
+              "fieldName": "subtype_id",
+              "fieldValue": "={{ 1 }}"
+            },
+            {
+              "fieldName": "body",
+              "fieldValue": "Продукт со статусом \"NOT LIVE\", market: Adeo (Leroy Merlin |ACME)"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.odoo",
+      "typeVersion": 1,
+      "position": [
+        1088,
+        1104
+      ],
+      "id": "d711fe91-0d0f-42b6-87f6-cf2ce6fcc107",
+      "name": "send message2",
+      "retryOnFail": true,
+      "credentials": {
+        "odooApi": {
+          "id": "",
+          "name": "YOUR_ODOOAPI_CREDENTIAL"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "custom",
+        "customResource": "x_auto_posting",
+        "operation": "update",
+        "customResourceId": "={{ $('Loop Over Items1').first().json.taskId }}",
+        "fieldsToCreateOrUpdate": {
+          "fields": [
+            {
+              "fieldName": "x_studio_stage_id",
+              "fieldValue": "={{ 3 }}"
+            },
+            {
+              "fieldName": "x_studio_add_from_api",
+              "fieldValue": "={{ true }}"
+            },
+            {
+              "fieldName": "x_studio_url_listing"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.odoo",
+      "typeVersion": 1,
+      "position": [
+        2352,
+        720
+      ],
+      "id": "21541aa7-8e18-4b82-9969-5b90d4b3b772",
+      "name": "send Active stage",
+      "retryOnFail": true,
+      "credentials": {
+        "odooApi": {
+          "id": "",
+          "name": "YOUR_ODOOAPI_CREDENTIAL"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "hours",
+              "hoursInterval": 6
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -1456,
+        64
+      ],
+      "id": "fb94dc65-ff38-4126-9e0d-d97cf92fdb94",
+      "name": "Schedule Trigger"
+    },
+    {
+      "parameters": {
+        "amount": 10
+      },
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        -336,
+        320
+      ],
+      "id": "f6ad729f-a3ba-431f-84ae-feee0cec6f4b",
+      "name": "Wait"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "2e0ff31e-8021-47ad-81c0-6421bdf7a3df",
+              "leftValue": "={{ $('product listed?').item.json.body[0].status }}",
+              "rightValue": "LIVE",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        832,
+        608
+      ],
+      "id": "9fef125c-1b2f-442b-8978-084b3449197a",
+      "name": "product LIVE?"
+    },
+    {
+      "parameters": {
+        "mode": "raw",
+        "jsonOutput": "{ \n  \"store\": \"adeo\", \n  \"baseUrl\": \"https://adeo-marketplace.mirakl.net\", \n  \"shop_ids\": 6026, \n  \"apiKey\": \"<REDACTED>\" \n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        352,
+        608
+      ],
+      "id": "766b537c-14f6-4327-a9d6-6fa94141d798",
+      "name": "Set params for Adeo",
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "9c5e0a3c-79ad-47e0-b25b-62302fdc3c4b",
+              "name": "taskId",
+              "value": "={{ $('Перебор всех продуктов').first().json.taskId }}",
+              "type": "array"
+            },
+            {
+              "id": "ab41e1cf-34d5-43d8-861e-5415d1ddc4cb",
+              "name": "productId",
+              "value": "={{ $('Перебор всех продуктов').first().json.productId }}",
+              "type": "number"
+            },
+            {
+              "id": "094b157a-a303-4528-8532-33e1bf822ed4",
+              "name": "action",
+              "value": "CREATE OFFER",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1856,
+        864
+      ],
+      "id": "498f2e25-7e50-4a91-bfa9-f9544ba89a2b",
+      "name": "Set Params"
+    },
+    {
+      "parameters": {
+        "jsCode": "const input = $input.all().map(e => e.json);\n\nconst filtered = input.filter(item => item.action === \"CREATE OFFER\");\n\nreturn filtered;\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        208,
+        224
+      ],
+      "id": "df9a07ee-11cc-4d35-b6c6-fc2c1c5302bc",
+      "name": "Filter Products for Offers"
+    },
+    {
+      "parameters": {
+        "amount": 60
+      },
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        560,
+        224
+      ],
+      "id": "e940a386-eb4c-421e-8e6a-727921722bb3",
+      "name": "Wait1"
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "SYtHlfzXOjdsreiN",
+          "mode": "list",
+          "cachedResultName": "[Adeo] Autoposting - Create Offers"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [
+        400,
+        224
+      ],
+      "id": "efb2d352-1a62-478b-b361-eada87af5a29",
+      "name": "Create Offers"
+    },
+    {
+      "parameters": {
+        "url": "=https://adeo-marketplace.mirakl.net/api/offers/imports/{{ $json.import_id }} ",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "<REDACTED>"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        752,
+        224
+      ],
+      "id": "46801150-5e13-4951-9e25-eee0568644d3",
+      "name": "Get Offers Status",
+      "retryOnFail": true,
+      "waitBetweenTries": 4000,
+      "alwaysOutputData": true,
+      "executeOnce": false,
+      "notesInFlow": false
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "5a8d6b74-9d15-47b5-9d9a-edee010c5937",
+              "leftValue": "={{ $json.success }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1136,
+        224
+      ],
+      "id": "b947640b-bd7e-4038-9c36-a91dc3975dbc",
+      "name": "Is Status Success?"
+    },
+    {
+      "parameters": {
+        "jsCode": "const res = $json;\n\nconst isSuccess = \n    (res.status === \"COMPLETE\" || res.status === \"WAITING\") &&\n    res.has_error_report === false &&\n    res.lines_in_error === 0 &&\n    (res.offer_inserted > 0 || res.offer_updated > 0);\n\nif (isSuccess) {\n    return [{ success: true }];\n} else {\n    return [{ success: false }];\n}\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        928,
+        224
+      ],
+      "id": "e77ae483-7ebf-440b-ab62-18f2b6f8c9d2",
+      "name": "Check Offers Status"
+    },
+    {
+      "parameters": {
+        "errorMessage": "Офера были отправлены, но есть ошибки или замечания от API Mirackl, нужна проверка. Market: Leroy Merlin | ACME"
+      },
+      "type": "n8n-nodes-base.stopAndError",
+      "typeVersion": 1,
+      "position": [
+        1360,
+        320
+      ],
+      "id": "74880f64-86c5-4bab-9649-c0c6c428a974",
+      "name": "Stop and Error"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        1728,
+        144
+      ],
+      "id": "4805d80a-d448-42f7-b38e-61d35d56cb7c",
+      "name": "Loop Over Items"
+    },
+    {
+      "parameters": {
+        "resource": "custom",
+        "customResource": "mail.message",
+        "fieldsToCreateOrUpdate": {
+          "fields": [
+            {
+              "fieldName": "model",
+              "fieldValue": "x_auto_posting"
+            },
+            {
+              "fieldName": "res_id",
+              "fieldValue": "={{ $('Loop Over Items').first().json.taskId }}"
+            },
+            {
+              "fieldName": "message_type",
+              "fieldValue": "comment"
+            },
+            {
+              "fieldName": "subtype_id",
+              "fieldValue": "={{ 1 }}"
+            },
+            {
+              "fieldName": "body",
+              "fieldValue": "Товар успешно залищен со статусом \"LIVE\" market: Leroy Merlin | ACME"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.odoo",
+      "typeVersion": 1,
+      "position": [
+        2176,
+        256
+      ],
+      "id": "47aaf21e-26bf-4fd6-a25a-c2a14d2e04b7",
+      "name": "send message3",
+      "retryOnFail": true,
+      "credentials": {
+        "odooApi": {
+          "id": "",
+          "name": "YOUR_ODOOAPI_CREDENTIAL"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "custom",
+        "customResource": "x_auto_posting",
+        "operation": "update",
+        "customResourceId": "={{ $json.taskId }}",
+        "fieldsToCreateOrUpdate": {
+          "fields": [
+            {
+              "fieldName": "x_studio_stage_id",
+              "fieldValue": "={{ 3 }}"
+            },
+            {
+              "fieldName": "x_studio_add_from_api",
+              "fieldValue": "={{ true }}"
+            },
+            {
+              "fieldName": "x_studio_url_listing"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.odoo",
+      "typeVersion": 1,
+      "position": [
+        1968,
+        256
+      ],
+      "id": "ed77b81f-a92b-4cc9-8a49-f3626e653b9c",
+      "name": "send Active stage1",
+      "retryOnFail": true,
+      "credentials": {
+        "odooApi": {
+          "id": "",
+          "name": "YOUR_ODOOAPI_CREDENTIAL"
+        }
+      }
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        1968,
+        16
+      ],
+      "id": "75e40f88-d0b6-4753-86ec-a902674adff2",
+      "name": "No Operation"
+    },
+    {
+      "parameters": {
+        "resource": "custom",
+        "customResource": "x_auto_posting",
+        "operation": "update",
+        "customResourceId": "={{ $('Loop Over Items3').first().json.taskId }}",
+        "fieldsToCreateOrUpdate": {
+          "fields": [
+            {
+              "fieldName": "x_studio_url_listing",
+              "fieldValue": "checked"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.odoo",
+      "typeVersion": 1,
+      "position": [
+        928,
+        1104
+      ],
+      "id": "4aea2696-e676-4858-b342-42ff5165666f",
+      "name": "Stay Pending Stage1",
+      "retryOnFail": true,
+      "credentials": {
+        "odooApi": {
+          "id": "",
+          "name": "YOUR_ODOOAPI_CREDENTIAL"
+        }
+      }
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        -720,
+        -80
+      ],
+      "id": "d06026cb-e76b-4e6d-a2c9-a8ae543ccbb0",
+      "name": "Do nothing"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "5db4cae1-37cb-45ba-9eb9-dec223120667",
+              "leftValue": "={{ $json }}",
+              "rightValue": "",
+              "operator": {
+                "type": "object",
+                "operation": "empty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -944,
+        64
+      ],
+      "id": "de2dc955-6360-4dbf-9667-8c7326a2cfa6",
+      "name": "If no Products"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "2e0ff31e-8021-47ad-81c0-6421bdf7a3df",
+              "leftValue": "={{ $json.total_count }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "notEquals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1200,
+        528
+      ],
+      "id": "c515de7c-b5dc-4f1e-a355-f475143bd048",
+      "name": "Has Product Offer?"
+    },
+    {
+      "parameters": {
+        "url": "={{ $('Set params for Adeo').first().json.baseUrl }}/api/offers ",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "shop_id",
+              "value": "={{ $('Set params for Adeo').first().json.shop_ids }}"
+            },
+            {
+              "name": "sku",
+              "value": "={{\n  (() => {\n    const sku = $('get items odoo').first().json.result[0].default_code || \"\";\n    return sku.startsWith(\"SKU-\") ? sku.slice(5) : sku;\n  })()\n}}"
+            }
+          ]
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "={{ $('Set params for Adeo').first().json.apiKey }}"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1024,
+        528
+      ],
+      "id": "0172164d-31a8-4494-979f-495212a42c96",
+      "name": "Check Offer by SKU",
+      "retryOnFail": true,
+      "waitBetweenTries": 4000,
+      "alwaysOutputData": true,
+      "executeOnce": false,
+      "notesInFlow": false
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "97d0fa67-332b-41f4-b2cb-a8caaac07621",
+              "leftValue": "={{ $json.total_count }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "notEquals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1504,
+        896
+      ],
+      "id": "ce673a3c-064c-4819-9d5f-c49283ad1466",
+      "name": "Has Product Offer 2?"
+    },
+    {
+      "parameters": {
+        "url": "={{ $('Set params for Adeo').first().json.baseUrl }}/api/offers ",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "shop_id",
+              "value": "={{ $('Set params for Adeo').first().json.shop_ids }}"
+            },
+            {
+              "name": "sku",
+              "value": "={{ $('get items odoo').first().json.result[0].x_studio_plenty_id }}"
+            }
+          ]
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "={{ $('Set params for Adeo').first().json.apiKey }}"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1328,
+        896
+      ],
+      "id": "c219405c-77a1-4c57-bcea-64dc1a182102",
+      "name": "Check Offer by Plenty varId",
+      "retryOnFail": true,
+      "waitBetweenTries": 4000,
+      "alwaysOutputData": true,
+      "executeOnce": false,
+      "notesInFlow": false
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "aee901a4-a15f-4522-918b-4b63d8392dd8",
+              "leftValue": "={{ $('get items odoo').first().json.result[0].x_studio_plenty_id.toBoolean() }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1488,
+        704
+      ],
+      "id": "71a7a3dd-f3aa-4e0b-b2c1-9500d17d59c8",
+      "name": "Is Plenty varId?"
+    },
+    {
+      "parameters": {
+        "resource": "custom",
+        "customResource": "x_auto_posting",
+        "operation": "update",
+        "customResourceId": "={{ $('Loop Over Items2').first().json.taskId }}",
+        "fieldsToCreateOrUpdate": {
+          "fields": [
+            {
+              "fieldName": "x_studio_url_listing"
+            },
+            {
+              "fieldName": "x_studio_stage_id",
+              "fieldValue": "={{ 1 }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.odoo",
+      "typeVersion": 1,
+      "position": [
+        384,
+        1104
+      ],
+      "id": "c9270ae5-5f3c-45e2-820d-2d36912684af",
+      "name": "Send New Task Stage",
+      "retryOnFail": true,
+      "credentials": {
+        "odooApi": {
+          "id": "",
+          "name": "YOUR_ODOOAPI_CREDENTIAL"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const data = $('Filter Products for Offers').all().map(i => i.json);\n\nconst ids = data.map(i => ({taskId: i.taskId}));\n\nreturn ids;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1360,
+        144
+      ],
+      "id": "8abc3f1a-12ab-44a6-8070-edce7bb48596",
+      "name": "Set Ids"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        1168,
+        896
+      ],
+      "id": "305a1610-9b69-4dca-a6f2-6bd6e88d7711",
+      "name": "Wait2"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "2656231c-4986-4bba-91bc-eafa0d887e80",
+              "name": "taskId",
+              "value": "={{ $('Перебор всех продуктов').first().json.taskId }}",
+              "type": "array"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1792,
+        512
+      ],
+      "id": "23c28fbb-7d57-42d7-ab5b-3794525c2986",
+      "name": "Set Ids1"
+    },
+    {
+      "parameters": {
+        "fieldToSplitOut": "taskId",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [
+        1952,
+        512
+      ],
+      "id": "889e2b30-272a-4868-9afc-eae887111236",
+      "name": "Split Ids"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        2112,
+        512
+      ],
+      "id": "4f3857f3-61fd-4e8c-822f-42c8b04c571f",
+      "name": "Loop Over Items1"
+    },
+    {
+      "parameters": {
+        "jsCode": "const input = $input.all().map(i => i.json);\n\nconst map = {};\n\nfor (const item of input) {\n  if (!map[item.productId]) {\n    map[item.productId] = [];\n  }\n  map[item.productId].push(item.taskId);\n}\n\nconst result = Object.entries(map).map(([productId, taskId]) => ({\n  productId: Number(productId),\n  taskId\n}));\n\nreturn result.map(r => ({ json: r }));\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -528,
+        64
+      ],
+      "id": "909c4750-4815-4d2e-b21c-0da835256a38",
+      "name": "Groupping Items"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "2656231c-4986-4bba-91bc-eafa0d887e80",
+              "name": "taskId",
+              "value": "={{ $('Перебор всех продуктов').first().json.taskId }}",
+              "type": "array"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        64,
+        880
+      ],
+      "id": "5b823169-5501-4a7f-8e82-e98246ce5b89",
+      "name": "Set Ids2"
+    },
+    {
+      "parameters": {
+        "fieldToSplitOut": "taskId",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [
+        224,
+        880
+      ],
+      "id": "da2aaa5e-abb2-4863-bea7-7a72f3c026e2",
+      "name": "Split Ids1"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        384,
+        880
+      ],
+      "id": "a01a90ed-b797-4ad2-8687-e6e46a960c08",
+      "name": "Loop Over Items2"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "2656231c-4986-4bba-91bc-eafa0d887e80",
+              "name": "taskId",
+              "value": "={{ $('Перебор всех продуктов').first().json.taskId }}",
+              "type": "array"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        608,
+        880
+      ],
+      "id": "64ce5e95-fd16-4dfd-b619-45150183e001",
+      "name": "Set Ids3"
+    },
+    {
+      "parameters": {
+        "fieldToSplitOut": "taskId",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [
+        768,
+        880
+      ],
+      "id": "57a9ad65-b260-42f0-a281-a0165ade6fb7",
+      "name": "Split Ids2"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        928,
+        880
+      ],
+      "id": "5d31750e-2df2-43f9-a422-18816f1e1ef2",
+      "name": "Loop Over Items3"
+    },
+    {
+      "parameters": {
+        "fieldToSplitOut": "taskId",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [
+        1536,
+        144
+      ],
+      "id": "2c1784e9-1ec2-4a09-94ac-afa57ab60c38",
+      "name": "Split Ids3"
+    }
+  ],
+  "connections": {
+    "product listed?": {
+      "main": [
+        [
+          {
+            "node": "check listed?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "check listed?": {
+      "main": [
+        [
+          {
+            "node": "product LIVE?",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Set Ids2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "get items odoo": {
+      "main": [
+        [
+          {
+            "node": "Set params for Adeo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set params Odoo": {
+      "main": [
+        [
+          {
+            "node": "get items odoo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "List ids": {
+      "main": [
+        [
+          {
+            "node": "Get pending product",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get pending product": {
+      "main": [
+        [
+          {
+            "node": "If no Products",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "product id": {
+      "main": [
+        [
+          {
+            "node": "Groupping Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Out": {
+      "main": [
+        [
+          {
+            "node": "Перебор всех продуктов",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Перебор всех продуктов": {
+      "main": [
+        [
+          {
+            "node": "Filter Products for Offers",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Set params Odoo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "send message1": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "product not listed": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "send message2": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "send Active stage": {
+      "main": [
+        [
+          {
+            "node": "send message1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "List ids",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait": {
+      "main": [
+        [
+          {
+            "node": "Перебор всех продуктов",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "product LIVE?": {
+      "main": [
+        [
+          {
+            "node": "Check Offer by SKU",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Set Ids3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set params for Adeo": {
+      "main": [
+        [
+          {
+            "node": "product listed?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set Params": {
+      "main": [
+        [
+          {
+            "node": "Wait",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter Products for Offers": {
+      "main": [
+        [
+          {
+            "node": "Create Offers",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait1": {
+      "main": [
+        [
+          {
+            "node": "Get Offers Status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Offers": {
+      "main": [
+        [
+          {
+            "node": "Wait1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Offers Status": {
+      "main": [
+        [
+          {
+            "node": "Check Offers Status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is Status Success?": {
+      "main": [
+        [
+          {
+            "node": "Set Ids",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Stop and Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Offers Status": {
+      "main": [
+        [
+          {
+            "node": "Is Status Success?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Over Items": {
+      "main": [
+        [
+          {
+            "node": "No Operation",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "send Active stage1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "send Active stage1": {
+      "main": [
+        [
+          {
+            "node": "send message3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "send message3": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "No Operation": {
+      "main": [
+        []
+      ]
+    },
+    "Stay Pending Stage1": {
+      "main": [
+        [
+          {
+            "node": "send message2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If no Products": {
+      "main": [
+        [
+          {
+            "node": "Do nothing",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "product id",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Has Product Offer?": {
+      "main": [
+        [
+          {
+            "node": "Set Ids1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Is Plenty varId?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Offer by SKU": {
+      "main": [
+        [
+          {
+            "node": "Has Product Offer?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Has Product Offer 2?": {
+      "main": [
+        [
+          {
+            "node": "Set Ids1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Set Params",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Offer by Plenty varId": {
+      "main": [
+        [
+          {
+            "node": "Has Product Offer 2?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is Plenty varId?": {
+      "main": [
+        [
+          {
+            "node": "Wait2",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Set Params",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send New Task Stage": {
+      "main": [
+        [
+          {
+            "node": "product not listed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set Ids": {
+      "main": [
+        [
+          {
+            "node": "Split Ids3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait2": {
+      "main": [
+        [
+          {
+            "node": "Check Offer by Plenty varId",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set Ids1": {
+      "main": [
+        [
+          {
+            "node": "Split Ids",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Ids": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Over Items1": {
+      "main": [
+        [
+          {
+            "node": "Wait",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "send Active stage",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Groupping Items": {
+      "main": [
+        [
+          {
+            "node": "Split Out",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set Ids2": {
+      "main": [
+        [
+          {
+            "node": "Split Ids1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Ids1": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Over Items2": {
+      "main": [
+        [
+          {
+            "node": "Wait",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send New Task Stage",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set Ids3": {
+      "main": [
+        [
+          {
+            "node": "Split Ids2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Ids2": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Over Items3": {
+      "main": [
+        [
+          {
+            "node": "Wait",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Stay Pending Stage1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Ids3": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": false
+  }
+}

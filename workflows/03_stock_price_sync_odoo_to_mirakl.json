@@ -1,0 +1,985 @@
+{
+  "name": "Stock & Price Sync: Odoo -> Mirakl Marketplace (batched diff update)",
+  "nodes": [
+    {
+      "parameters": {
+        "inputSource": "passthrough"
+      },
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        -2768,
+        320
+      ],
+      "id": "349e01ce-5dd3-451d-a959-4669602708c7",
+      "name": "Start"
+    },
+    {
+      "parameters": {
+        "resource": "custom",
+        "customResource": "product.pricelist.item",
+        "operation": "getAll",
+        "returnAll": true,
+        "options": {
+          "fieldsList": [
+            "pricelist_id",
+            "currency_id",
+            "fixed_price",
+            "name",
+            "product_tmpl_id"
+          ]
+        },
+        "filterRequest": {
+          "filter": [
+            {
+              "fieldName": "pricelist_id",
+              "value": "={{ $json.pricelist_id }}"
+            },
+            {
+              "fieldName": "product_tmpl_id",
+              "operator": "in",
+              "value": "={{ $('Start').first().json.list_for_update.map(i => i.product_id) }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.odoo",
+      "typeVersion": 1,
+      "position": [
+        -1504,
+        448
+      ],
+      "id": "dbff64b1-540f-4055-9219-f493b48d3199",
+      "name": "Get Price",
+      "alwaysOutputData": true,
+      "executeOnce": true,
+      "credentials": {
+        "odooApi": {
+          "id": "",
+          "name": "YOUR_ODOOAPI_CREDENTIAL"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "raw",
+        "jsonOutput": "{\n  \"odoo_name_sql\": \"your_odoo_db\",\n  \"odoo_id_user_api\": 2,\n  \"odoo_api\": \"<REDACTED>\",\n  \"odoProdUrl\": \"https://your-instance.example.com/jsonrpc\",\n  \"odoStageUrl\": \"https://your-instance.example.com/jsonrpc\"\n}\n",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -2592,
+        320
+      ],
+      "id": "71d2be28-4cd8-4e2b-8b4d-1a09d8f92ef7",
+      "name": "Api Odoo"
+    },
+    {
+      "parameters": {
+        "mode": "raw",
+        "jsonOutput": "{ \n  \"store\": \"adeo\", \n  \"baseUrl\": \"https://adeo-marketplace.mirakl.net\", \n  \"shop_ids\": 6026, \n  \"apiKey\": \"<REDACTED>\" \n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -2416,
+        320
+      ],
+      "id": "33232218-6beb-4f2e-939c-7533c629c8ea",
+      "name": "Api Adeo"
+    },
+    {
+      "parameters": {
+        "fieldToSplitOut": "websitesData",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [
+        -1904,
+        320
+      ],
+      "id": "767f2f8b-1f48-4f12-8252-e33bc618c963",
+      "name": "Split Out"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        -1712,
+        320
+      ],
+      "id": "07de2165-f53d-4ddd-8632-ef0d7b6f198d",
+      "name": "Loop Over Items"
+    },
+    {
+      "parameters": {
+        "jsCode": "const websitesData = [\n    {\n        websiteId: 95,\n        pricelist_id: 3,\n        locale_code: \"fr_FR\",\n        description: \"Leroy Merlin France channel\",\n        label: \"LMFR\"\n    },\n    {\n        websiteId: 96,\n        pricelist_id: 24,\n        locale_code: \"es_ES\",\n        description: \"Leroy Merlin Spain channel\",\n        label: \"LMES\"\n    },\n    {\n        websiteId: 97,\n        pricelist_id: 20,\n        locale_code: \"pt_PT\",\n        description: \"Leroy Merlin Portugal channel\",\n        label: \"LMPT\"\n    },\n    {\n        websiteId: 98,\n        pricelist_id: 15,\n        locale_code: \"it_IT\",\n        description: \"Leroy Merlin Italy channel\",\n        label: \"LMIT\"\n    }\n    // {\n    //     websiteId: null,\n    //     pricelist_id: null,\n    //     locale_code: \"pl_PL\",\n    //     description: \"\",\n    //     label: \"\"\n    // }\n];\n\nreturn { websitesData };\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -2080,
+        320
+      ],
+      "id": "a8a0dc24-0815-4e31-bfb6-aad154ff31b3",
+      "name": "Adeo Basic Settings"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('Api Odoo').first().json.odoProdUrl }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n    \"jsonrpc\": \"2.0\",\n    \"method\": \"call\",\n    \"params\": {\n        \"service\": \"object\",\n        \"method\": \"execute_kw\",\n        \"args\": [\n            \"{{ $('Api Odoo').first().json.odoo_name_sql }}\",\n            \"{{ $('Api Odoo').first().json.odoo_id_user_api }}\",\n            \"{{ $('Api Odoo').first().json.odoo_api }}\",\n            \"product.template\",\n            \"search_read\",\n            [\n                [\n                    [\"id\", \"in\", [{{ $('Start').item.json.list_for_update.map(i => i.product_id) }}]]\n                ]\n            ],\n            {\n                \"fields\": [\n                  \"default_code\",\n                  \"x_studio_plenty_id\",\n                  \"list_price\",\n                  \"x_studio_free_to_use\",\n                  \"base_unit_id\",\n                  \"x_studio_basic_quantity\",\n                  \"product_tag_ids\"\n                ]\n            }\n        ]\n    }\n}\n ",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -2256,
+        320
+      ],
+      "id": "7890945e-0e34-447b-b21a-b3549df51189",
+      "name": "Get Items Odoo",
+      "retryOnFail": true,
+      "waitBetweenTries": 4000,
+      "executeOnce": true
+    },
+    {
+      "parameters": {
+        "url": "={{ $('Api Adeo').first().json.baseUrl }}/api/offers?max=100&offset={{ $json.offset }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Authorization",
+              "value": "={{ $('Api Adeo').first().json.apiKey }}"
+            },
+            {
+              "name": "Accept",
+              "value": "application/json"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -480,
+        464
+      ],
+      "id": "d142afab-554d-4066-92a6-3b7ebd15a837",
+      "name": "Get Offers Adeo",
+      "retryOnFail": true,
+      "waitBetweenTries": 5000
+    },
+    {
+      "parameters": {
+        "jsCode": "const responseAdeo = $input.first().json.offers;\n\nconst arrayFromAdeo = responseAdeo.map(el => ({\n    sku: el.shop_sku,\n    stockAdeo: el.quantity,\n    priceAdeo: el.price,\n    leadToShipTimeAdeo: el.leadtime_to_ship,\n    logisticAdeo: el.logistic_class.code,\n}));\n\nreturn {arrayFromAdeo};\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -320,
+        464
+      ],
+      "id": "7ade463b-2135-4b28-a1ad-7e4e13cf3bdf",
+      "name": "Processing Data from Adeo"
+    },
+    {
+      "parameters": {
+        "jsCode": "let pricesByCountry = $input.all().map(item => item.json); \nconst allProducts = $('Get Items Odoo').first().json.result;\n\nconst merged = pricesByCountry.map(priceItem => {\n  // Беремо id з самого елемента\n  const product_id = priceItem.product_tmpl_id?.[0]; \n  \n  const product = allProducts.find(p => p.id === product_id);\n\n  return {\n    json: {\n      product_id,\n      ...priceItem,\n      ...(product || {})\n    }\n  };\n});\n\nreturn merged;\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1344,
+        448
+      ],
+      "id": "29c50d14-510f-42bd-b48f-f9d056978e48",
+      "name": "Agregate Data"
+    },
+    {
+      "parameters": {
+        "aggregate": "aggregateAllItemData",
+        "destinationFieldName": "=products_{{ $('Get Price').first().json.pricelist_id[1].split(\" \")[0] }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.aggregate",
+      "typeVersion": 1,
+      "position": [
+        -1184,
+        448
+      ],
+      "id": "1672f195-fd96-4eb7-a18a-8fb8093ae597",
+      "name": "Gruped by Lang"
+    },
+    {
+      "parameters": {
+        "jsCode": "const input = $input.all().map(i => i.json);\n\nconst merged = {};\n\ninput.forEach(countryBlock => {\n  const [countryKey, products] = Object.entries(countryBlock)[0]; \n  const countryName = countryKey.replace(\"products_\", \"\"); \n\n  products.forEach(product => {\n    const productId = product.product_tmpl_id[0]; \n    const rawCode = product.default_code || \"\";\n    const cleanSKU = rawCode.replace(/^SKU-/, \"\"); \n\n    function getLogisticClass(product_tag_ids) {\n  switch (true) {\n    case product_tag_ids.includes(9):\n      return \"FREE\"\n\n    case product_tag_ids.includes(2):\n      return 'M';\n\n    case product_tag_ids.includes(1):\n      return \"XS\"\n  }\n};\n\n\n    // створюємо або оновлюємо об’єкт\n    merged[productId] = {\n      ...(merged[productId] || {}),\n      product_id: productId,\n      sku: cleanSKU,\n      plentyId: product.x_studio_plenty_id,\n      name: product.name,\n      stockOdoo: product.x_studio_free_to_use,\n      logisticOdoo: getLogisticClass(product.product_tag_ids),\n      // одразу рахуємо максимум\n      priceOdoo: Math.max(\n        merged[productId]?.priceOdoo || 0,\n        product.fixed_price || 0\n      ),\n      [`${countryName}_price`]: product.fixed_price\n    };\n  });\n});\n\nreturn { arrayFromOdoo: Object.values(merged) };\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1504,
+        224
+      ],
+      "id": "23a49931-d0f8-493a-965e-816166ca4fa9",
+      "name": "Processing Data from Odoo"
+    },
+    {
+      "parameters": {
+        "jsCode": "const arrayFromOdoo = $('Processing Data from Odoo').first().json.arrayFromOdoo;\nconst arrayFromAdeo = $('Processing Data from Adeo').first().json.arrayFromAdeo;\n\nconst matchedProducts = arrayFromOdoo.map(odooItem => {\n  if (odooItem.sku && odooItem.sku.startsWith('SKU-')) {\n    odooItem.sku = odooItem.sku.slice(5);\n  }\n  \n  const matched = arrayFromAdeo.find(adeoItem => \n    (odooItem.plentyId && odooItem.plentyId === adeoItem.sku) || odooItem.sku === adeoItem.sku\n  );\n\n  if (matched) {\n    // якщо ціна і сток однакові — пропускаємо\n    if (\n      matched.priceAdeo === odooItem.priceOdoo &&\n      matched.stockAdeo === odooItem.stockOdoo &&\n      matched.logisticAdeo === odooItem.logisticOdoo\n    ) {\n      return null;\n    }\n\n    // Визначаємо, яке саме значення збіглося\n    const matched_sku = (odooItem.plentyId && odooItem.plentyId === matched.sku) \n      ? odooItem.plentyId \n      : odooItem.sku;\n\n    return { ...odooItem, matched_sku };\n  }\n\n  return null; // не матчиться\n}).filter(Boolean); // прибираємо null\n\nreturn { matchedProducts };\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -160,
+        464
+      ],
+      "id": "cb7b8194-edc9-4e54-b9d3-ac4b5e25bd98",
+      "name": "Compare Data",
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const matchedProducts = $input.first().json.matchedProducts;\n\nconst offers = matchedProducts.map(el => {\n    const maxPrice = Math.max(\n        el.France_price || 0,\n        el.Spain_price || 0,\n        el.Portugal_price || 0,\n        el.Italy_price || 0\n    );\n\n    return {\n        \"all_prices\": [\n          {\n            \"channel_code\": \"001\",\n            \"unit_origin_price\": el.France_price\n          },\n          {\n            \"channel_code\": \"002\",\n            \"unit_origin_price\": el.Spain_price\n          },\n          {\n            \"channel_code\": \"003\",\n            \"unit_origin_price\": el.Portugal_price\n          },\n          {\n            \"channel_code\": \"005\",\n            \"unit_origin_price\": el.Italy_price\n          }\n        ],\n        quantity: el.stockOdoo,\n        shop_sku: el.matched_sku,\n        update_delete: \"update\",\n        price: maxPrice,\n        state_code: \"11\",\n        logistic_class: el.logisticOdoo\n    };\n});\n\nreturn { offers };\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        672,
+        240
+      ],
+      "id": "03e78f09-94d0-436f-aa64-6048643fb392",
+      "name": "Preparing Data for Update"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('Api Adeo').first().json.baseUrl }}/api/offers",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Authorization",
+              "value": "={{ $('Api Adeo').first().json.apiKey }}"
+            },
+            {
+              "name": "Accept",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "offers",
+              "value": "={{ $json.offers }}"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": true
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        832,
+        240
+      ],
+      "id": "e7554d3f-a2f4-462b-8b65-4e9abf1e093e",
+      "name": "Update Offers",
+      "retryOnFail": true,
+      "waitBetweenTries": 3000
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "YL46iq96SVEA0LVN",
+          "mode": "id",
+          "cachedResultUrl": "/workflow/<WORKFLOW_ID>"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {
+          "waitForSubWorkflow": false
+        }
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [
+        992,
+        240
+      ],
+      "id": "b576a14a-7614-458b-afd8-b81eda9e06d2",
+      "name": "Get New Tasks from CRON"
+    },
+    {
+      "parameters": {
+        "url": "={{ $('Api Adeo').first().json.baseUrl }}/api/offers?max=1&offset=0",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Authorization",
+              "value": "={{ $('Api Adeo').first().json.apiKey }}"
+            },
+            {
+              "name": "Accept",
+              "value": "application/json"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -1328,
+        224
+      ],
+      "id": "02e7fe1b-db41-494b-b7da-8629bd6367f7",
+      "name": "Get Total Offers Adeo",
+      "retryOnFail": true,
+      "waitBetweenTries": 5000
+    },
+    {
+      "parameters": {
+        "jsCode": "let totalAmountOfItemsMirakl = $input.first().json.total_count;\n\nlet offset = 0;\n\nlet offsetItems = [];\n\nwhile (offset < totalAmountOfItemsMirakl) {\n\n  offsetItems.push({ offset: offset });\n  offset += 100;\n};\n\nreturn { offsetItems };\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1168,
+        224
+      ],
+      "id": "c473c642-8057-4975-9608-69942f89d98e",
+      "name": "Set Offset"
+    },
+    {
+      "parameters": {
+        "fieldToSplitOut": "offsetItems",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [
+        -1008,
+        224
+      ],
+      "id": "590de508-243f-4824-93e3-2e2534453a1d",
+      "name": "Split Items"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        -688,
+        224
+      ],
+      "id": "76114be9-d761-45ca-838e-9f04bb5e08c3",
+      "name": "Loop Over Offsets"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        -864,
+        224
+      ],
+      "id": "512ad41c-6e9b-475f-bf7c-46e4ddea0ecf",
+      "name": "Wait1"
+    },
+    {
+      "parameters": {
+        "jsCode": "const allItems = $input.all();\nlet merged = [];\n\nallItems.forEach(item => {\n  if (Array.isArray(item.json.matchedProducts)) {\n    merged = merged.concat(item.json.matchedProducts);\n  }\n});\n\nreturn { matchedProducts: merged }\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -352,
+        128
+      ],
+      "id": "aba7cf12-92c5-4360-b9bc-5b8ce00e7ab0",
+      "name": "Merged Products"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "77d7701e-c91c-40b5-b09d-5e948cf188d3",
+              "name": "matchedProducts",
+              "value": "={{ $json.matchedProducts }}",
+              "type": "array"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -512,
+        128
+      ],
+      "id": "fc4c6233-583d-4115-b383-171b181165ec",
+      "name": "Set Items"
+    },
+    {
+      "parameters": {
+        "amount": 20
+      },
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        0,
+        464
+      ],
+      "id": "81c06a6e-0e80-41c0-8448-7bda344d905c",
+      "name": "Wait2"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "e1db5dc0-0a92-45c3-ad2b-622cd314ee63",
+              "leftValue": "={{ $json.matchedProducts }}",
+              "rightValue": "",
+              "operator": {
+                "type": "array",
+                "operation": "empty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -208,
+        128
+      ],
+      "id": "26b1f081-881f-4a89-a611-831d68b8f66e",
+      "name": "If Empty"
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "YL46iq96SVEA0LVN",
+          "mode": "id",
+          "cachedResultUrl": "/workflow/<WORKFLOW_ID>"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {
+          "waitForSubWorkflow": false
+        }
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        0
+      ],
+      "id": "c3fb1bac-5ac0-4044-9160-56e467f0b968",
+      "name": "Get New Tasks from CRON1"
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "KSJdsUtXc0exJx0e",
+          "mode": "id",
+          "cachedResultUrl": "/workflow/<WORKFLOW_ID>"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [
+        336,
+        240
+      ],
+      "id": "af53b758-df94-42e9-82aa-155a34fecf2b",
+      "name": "SKU check"
+    },
+    {
+      "parameters": {
+        "mode": "raw",
+        "jsonOutput": "={{ \n  Object.assign({\n    workflow: $workflow,\n    execution_id: $execution.id\n  }, $json)\n}}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        176,
+        240
+      ],
+      "id": "eb4177ca-04b2-4bcd-b2e5-ed6b6d6c755a",
+      "name": "Add Workflow Data"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "28e63f27-c533-4ae8-9ec3-38818d1a45b8",
+              "name": "mp",
+              "value": "Adeo",
+              "type": "string"
+            },
+            {
+              "id": "b94f8e60-964d-4d9e-93b2-84602529e332",
+              "name": "skus",
+              "value": "={{ $json.matchedProducts.map(item => item.matched_sku) }}",
+              "type": "array"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        0,
+        240
+      ],
+      "id": "59393f83-5f18-4f7a-ab61-9143931e05b7",
+      "name": "Set Skus Data"
+    },
+    {
+      "parameters": {
+        "jsCode": "const filteredSkus = $input.first().json.skus;\nconst allProducts = $('Merged Products').first().json.matchedProducts;\n\nconst filteredProducts = allProducts.filter(i => filteredSkus.includes(i.matched_sku));\n\n\n\nreturn {matchedProducts: filteredProducts};\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        496,
+        240
+      ],
+      "id": "ced9f2db-1571-4afb-a67d-c16dfa39df21",
+      "name": "Filtered Products"
+    }
+  ],
+  "connections": {
+    "Api Odoo": {
+      "main": [
+        [
+          {
+            "node": "Api Adeo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Start": {
+      "main": [
+        [
+          {
+            "node": "Api Odoo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Out": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Over Items": {
+      "main": [
+        [
+          {
+            "node": "Processing Data from Odoo",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Get Price",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Api Adeo": {
+      "main": [
+        [
+          {
+            "node": "Get Items Odoo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Adeo Basic Settings": {
+      "main": [
+        [
+          {
+            "node": "Split Out",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Price": {
+      "main": [
+        [
+          {
+            "node": "Agregate Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Items Odoo": {
+      "main": [
+        [
+          {
+            "node": "Adeo Basic Settings",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Offers Adeo": {
+      "main": [
+        [
+          {
+            "node": "Processing Data from Adeo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Agregate Data": {
+      "main": [
+        [
+          {
+            "node": "Gruped by Lang",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gruped by Lang": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Processing Data from Adeo": {
+      "main": [
+        [
+          {
+            "node": "Compare Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Processing Data from Odoo": {
+      "main": [
+        [
+          {
+            "node": "Get Total Offers Adeo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Compare Data": {
+      "main": [
+        [
+          {
+            "node": "Wait2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Preparing Data for Update": {
+      "main": [
+        [
+          {
+            "node": "Update Offers",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Offers": {
+      "main": [
+        [
+          {
+            "node": "Get New Tasks from CRON",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Total Offers Adeo": {
+      "main": [
+        [
+          {
+            "node": "Set Offset",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set Offset": {
+      "main": [
+        [
+          {
+            "node": "Split Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Items": {
+      "main": [
+        [
+          {
+            "node": "Wait1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Over Offsets": {
+      "main": [
+        [
+          {
+            "node": "Set Items",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Get Offers Adeo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait1": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Offsets",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set Items": {
+      "main": [
+        [
+          {
+            "node": "Merged Products",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merged Products": {
+      "main": [
+        [
+          {
+            "node": "If Empty",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait2": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Offsets",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If Empty": {
+      "main": [
+        [
+          {
+            "node": "Get New Tasks from CRON1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Set Skus Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "SKU check": {
+      "main": [
+        [
+          {
+            "node": "Filtered Products",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Add Workflow Data": {
+      "main": [
+        [
+          {
+            "node": "SKU check",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set Skus Data": {
+      "main": [
+        [
+          {
+            "node": "Add Workflow Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filtered Products": {
+      "main": [
+        [
+          {
+            "node": "Preparing Data for Update",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": false
+  }
+}

@@ -1,0 +1,2174 @@
+{
+  "name": "Marketplace Orders -> Odoo Sales Orders (customer dedup, pagination)",
+  "nodes": [
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $(\"ACME | Otto\").first().json.x_studio_base_url }}/v1/token",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "form-urlencoded",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "grant_type",
+              "value": "client_credentials"
+            },
+            {
+              "name": "scope",
+              "value": "={{ $json.x_studio_grant_type }}"
+            },
+            {
+              "name": "client_id",
+              "value": "={{ $json.x_studio_user }}"
+            },
+            {
+              "name": "client_secret",
+              "value": "={{ $json.x_studio_password }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -2368,
+        128
+      ],
+      "id": "4b27c661-d83f-4b08-b442-004e7d0d8cd4",
+      "name": "Get Otto token",
+      "executeOnce": false,
+      "retryOnFail": false,
+      "maxTries": 5,
+      "waitBetweenTries": 5000
+    },
+    {
+      "parameters": {
+        "amount": 1
+      },
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        -1936,
+        272
+      ],
+      "id": "e60fbae1-7d5c-4e58-a2b9-6c8103bccf4e",
+      "name": "Wait"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "48386895-0878-4990-945a-2fcbe5ab99dc",
+              "name": "orders",
+              "value": "={{ [] }}",
+              "type": "array"
+            },
+            {
+              "id": "f2c00ced-6e2e-4b2d-984d-60b9ca4f0a12",
+              "name": "href",
+              "value": "=/v4/orders?fulfillmentStatus=PROCESSABLE",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -2160,
+        128
+      ],
+      "id": "4569203f-d43d-4ec6-9c21-8a308edc8855",
+      "name": "Pagination data"
+    },
+    {
+      "parameters": {
+        "jsCode": "const orders = [\n  ...($('Wait').first().json.orders || []),\n  ...($('Get Otto orders').first().json.resources || [])\n];\n\nconst href = $input.first().json.links.find(item => item.rel === 'next').href\n\nreturn { orders, href };"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1008,
+        400
+      ],
+      "id": "9340a337-f1b9-423e-9d1b-22de5b1d53c0",
+      "name": "Pagination continue"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        -608,
+        112
+      ],
+      "id": "989cbfea-77f8-4310-8b66-6237358c45b4",
+      "name": "No orders"
+    },
+    {
+      "parameters": {
+        "method": "=GET",
+        "url": "={{ $(\"ACME | Otto\").first().json.x_studio_base_url }}{{ $json.href }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "={{ $('Get Otto token').item.json.token_type }} {{ $('Get Otto token').item.json.access_token }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -1712,
+        128
+      ],
+      "id": "484b38de-80dc-47c1-a93a-b1c1d40c1503",
+      "name": "Get Otto orders",
+      "retryOnFail": true,
+      "maxTries": 5,
+      "waitBetweenTries": 5000
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "40c66a81-b45e-4622-9c23-130b57181015",
+              "leftValue": "={{ $json.result }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "array",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        3248,
+        -2256
+      ],
+      "id": "92bd78e8-c842-49b5-8dc8-4b601fa87495",
+      "name": "If order exists",
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "c88055fc-d4df-412c-b47d-0639934ef0f5",
+              "leftValue": "={{ $('Addresses').item.json.similar }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        4224,
+        -2144
+      ],
+      "id": "35619262-c292-4689-807b-191d9402bac9",
+      "name": "If similar address",
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const localization = {\n  ALB: { code: 'AL', lang: 'sq_AL' }, // Албанія\n  AND: { code: 'AD', lang: 'ca_AD' }, // Андорра\n  ARM: { code: 'AM', lang: 'hy_AM' }, // Вірменія\n  AUT: { code: 'AT', lang: 'de_AT' }, // Австрія\n  AZE: { code: 'AZ', lang: 'az_AZ' }, // Азербайджан\n  BEL: { code: 'BE', lang: 'nl_BE' }, // Бельгія\n  BIH: { code: 'BA', lang: 'bs_BA' }, // Боснія і Герцеговина\n  BLR: { code: 'BY', lang: 'be_BY' }, // Білорусь\n  BGR: { code: 'BG', lang: 'bg_BG' }, // Болгарія\n  HRV: { code: 'HR', lang: 'hr_HR' }, // Хорватія\n  CZE: { code: 'CZ', lang: 'cs_CZ' }, // Чехія\n  DNK: { code: 'DK', lang: 'da_DK' }, // Данія\n  EST: { code: 'EE', lang: 'et_EE' }, // Естонія\n  FIN: { code: 'FI', lang: 'fi_FI' }, // Фінляндія\n  FRA: { code: 'FR', lang: 'fr_FR' }, // Франція\n  GEO: { code: 'GE', lang: 'ka_GE' }, // Грузія\n  DEU: { code: 'DE', lang: 'de_DE' }, // Німеччина\n  GRC: { code: 'GR', lang: 'el_GR' }, // Греція\n  HUN: { code: 'HU', lang: 'hu_HU' }, // Угорщина\n  ISL: { code: 'IS', lang: 'is_IS' }, // Ісландія\n  IRL: { code: 'IE', lang: 'en_IE' }, // Ірландія\n  ISR: { code: 'IL', lang: 'he_IL' }, // Ізраїль\n  ITA: { code: 'IT', lang: 'it_IT' }, // Італія\n  KAZ: { code: 'KZ', lang: 'kk_KZ' }, // Казахстан\n  KOS: { code: 'XK', lang: 'sq_XK' }, // Косово\n  LVA: { code: 'LV', lang: 'lv_LV' }, // Латвія\n  LIE: { code: 'LI', lang: 'de_LI' }, // Ліхтенштейн\n  LTU: { code: 'LT', lang: 'lt_LT' }, // Литва\n  LUX: { code: 'LU', lang: 'lb_LU' }, // Люксембург\n  MKD: { code: 'MK', lang: 'mk_MK' }, // Північна Македонія\n  MDA: { code: 'MD', lang: 'ro_MD' }, // Молдова\n  MLT: { code: 'MT', lang: 'mt_MT' }, // Мальта\n  MNE: { code: 'ME', lang: 'sr_ME' }, // Чорногорія\n  NLD: { code: 'NL', lang: 'nl_NL' }, // Нідерланди\n  NOR: { code: 'NO', lang: 'no_NO' }, // Норвегія\n  POL: { code: 'PL', lang: 'pl_PL' }, // Польща\n  PRT: { code: 'PT', lang: 'pt_PT' }, // Португалія\n  ROM: { code: 'RO', lang: 'ro_RO' }, // Румунія\n  RUS: { code: 'RU', lang: 'ru_RU' }, // Росія\n  SMR: { code: 'SM', lang: 'it_SM' }, // Сан-Марино\n  SRB: { code: 'RS', lang: 'sr_RS' }, // Сербія\n  SVK: { code: 'SK', lang: 'sk_SK' }, // Словаччина\n  SVN: { code: 'SI', lang: 'sl_SI' }, // Словенія\n  ESP: { code: 'ES', lang: 'es_ES' }, // Іспанія\n  SWE: { code: 'SE', lang: 'sv_SE' }, // Швеція\n  CHE: { code: 'CH', lang: 'de_CH' }, // Швейцарія\n  TUR: { code: 'TR', lang: 'tr_TR' }, // Туреччина\n  UKR: { code: 'UA', lang: 'uk_UA' }, // Україна\n  GBR: { code: 'GB', lang: 'en_GB' }, // Велика Британія\n  CAN: { code: 'CA', lang: 'en_CA' }, // Канада\n  MEX: { code: 'MX', lang: 'es_MX' }, // Мексика\n  USA: { code: 'US', lang: 'en_US' }, // США\n};\n\nconst deliveryAddress = {\n  lastName: $('Order item').item.json.deliveryAddress.lastName,\n  firstName: $('Order item').item.json.deliveryAddress.firstName,\n  street: $('Order item').item.json.deliveryAddress.street,\n  houseNumber: $('Order item').item.json.deliveryAddress.houseNumber,\n  city: $('Order item').item.json.deliveryAddress.city,\n  zipCode: $('Order item').item.json.deliveryAddress.zipCode,\n  countryCode: $('Order item').item.json.deliveryAddress.countryCode,\n};\n\nconst invoiceAddress = {\n  lastName: $('Order item').item.json.invoiceAddress.lastName,\n  firstName: $('Order item').item.json.invoiceAddress.firstName,\n  street: $('Order item').item.json.invoiceAddress.street,\n  houseNumber: $('Order item').item.json.invoiceAddress.houseNumber,\n  city: $('Order item').item.json.invoiceAddress.city,\n  zipCode: $('Order item').item.json.invoiceAddress.zipCode,\n  countryCode: $('Order item').item.json.invoiceAddress.countryCode,\n};\n\nconst similar = JSON.stringify(deliveryAddress) === JSON.stringify(invoiceAddress);\n\nreturn {\n  similar,\n  deliveryAddress: {\n    ...deliveryAddress,\n    countryCode: localization[$('Order item').item.json.deliveryAddress.countryCode].code,\n    lang: localization[$('Order item').item.json.deliveryAddress.countryCode].lang,\n    email: $('Order item').item.json.invoiceAddress.email\n  },\n  invoiceAddress: {\n    ...invoiceAddress,\n    countryCode: localization[$('Order item').item.json.invoiceAddress.countryCode].code,\n    lang: localization[$('Order item').item.json.invoiceAddress.countryCode].lang,\n    email: $('Order item').item.json.invoiceAddress.email\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3792,
+        -2144
+      ],
+      "id": "6dcf7f82-ccf9-4624-bd3d-2a7c70a9525c",
+      "name": "Addresses",
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('ACME | Odoo').item.json.x_studio_base_url }}",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"jsonrpc\": \"2.0\",\n  \"method\": \"call\",\n  \"params\": {\n    \"service\": \"object\",\n    \"method\": \"execute_kw\",\n    \"args\": [\n      \"{{ $('ACME | Odoo').item.json.x_studio_sql_name }}\",\n      {{ $('ACME | Odoo').item.json.x_studio_user }},\n      \"{{ $('ACME | Odoo').item.json.x_studio_api }}\",\n      \"res.partner\",\n      \"create\",\n      [\n        {\n          \"type\": \"invoice\",\n          \"parent_id\": {{ $json.odoo_main_customer_id }},\n          \"name\": \"{{ $('Addresses').item.json.invoiceAddress.firstName }} {{ $('Addresses').item.json.invoiceAddress.lastName }}\",\n          \"country_id\": {{ $('Country IDs').item.json.result[0].id }},\n          \"city\": \"{{ $('Addresses').item.json.invoiceAddress.city }}\",\n          \"street\": \"{{ $('Addresses').item.json.invoiceAddress.street }} {{ $('Addresses').item.json.invoiceAddress.houseNumber }}\",\n          \"zip\": \"{{ $('Addresses').item.json.invoiceAddress.zipCode }}\",\n          \"email\": \"{{ $('Addresses').item.json.invoiceAddress.email }}\",\n          \"mobile\": \"{{ $('Addresses').item.json.invoiceAddress.phoneNumber || \"+4942214577700\"}}\",\n          \"lang\": \"{{ $('Addresses').item.json.invoiceAddress.lang }}\"\n        }\n      ]\n    ]\n  }\n}\n",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        6480,
+        -1712
+      ],
+      "id": "2207c903-d061-4518-8f95-90be76669e73",
+      "name": "Create Invoice Contact",
+      "retryOnFail": true,
+      "maxTries": 5,
+      "waitBetweenTries": 5000,
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "e44b1e45-c3a7-44a5-af4e-7603c6029fa8",
+              "leftValue": "={{ $json.orders }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "array",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -832,
+        0
+      ],
+      "id": "5ac0347a-d93a-4869-8436-c74316ba40bd",
+      "name": "If orders got"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "a2f76530-e22a-4cd0-905d-ab3d39292266",
+              "name": "odoo_main_customer_id",
+              "value": "={{ $json.odoo_main_customer_id }}",
+              "type": "number"
+            },
+            {
+              "id": "c7827a1f-8605-4cd8-8b43-0e7ffecd5bab",
+              "name": "odoo_secondary_customer_id",
+              "value": "={{ $json.odoo_secondary_customer_id }}",
+              "type": "number"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        7696,
+        -2368
+      ],
+      "id": "acc36f71-277e-45ce-b327-64dab255bf16",
+      "name": "Order data",
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "6c15a668-b761-4a29-8d75-a519244032b6",
+              "leftValue": "={{ $('Find secondary customer').first().json.result }}",
+              "rightValue": "",
+              "operator": {
+                "type": "array",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "or"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        6032,
+        -1920
+      ],
+      "id": "c9d9f844-a883-4b41-af42-efbbac4aacc7",
+      "name": "If invoice contact",
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "a0318e2f-5987-41e3-b93b-be2181d085c6",
+              "leftValue": "={{ $json.result }}",
+              "rightValue": "",
+              "operator": {
+                "type": "array",
+                "operation": "empty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        4880,
+        -2464
+      ],
+      "id": "07e4bbbe-f7b0-4eef-9320-7a235fb9dc1c",
+      "name": "If contact doesn't exist",
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "FFxV5UwlTlZzjGMn",
+          "mode": "list",
+          "cachedResultUrl": "/workflow/<WORKFLOW_ID>",
+          "cachedResultName": "[ Otto ] - (subworkflow) Get product IDs"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "mode": "each",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [
+        8144,
+        -2368
+      ],
+      "id": "cd87085a-e960-4eb4-9045-6c9e6e1e2962",
+      "name": "Get Odoo IDs",
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "fieldToSplitOut": "orders",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [
+        -608,
+        -96
+      ],
+      "id": "71bc6033-8688-427d-bf40-f8b685c3394d",
+      "name": "Split orders"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const productsIds = $input.item.json.products\nconst website = 31;\n\nconst shipPrice = $('Split orders').item.json.initialDeliveryFees[0].deliveryFeeAmount.amount;\n\nconst orderProducts = $('Split orders').item.json.positionItems.map(productItem => {\n  const { sku, ean } = productItem.product;\n  const product_id = productsIds.find(item => item.default_code === sku ||\n                                              item.x_studio_variation_id === sku ||\n                                              item.barcode === ean);\n  \n  const product_uom_qty = 1;\n  const price_unit = productItem.itemValueGrossPrice.amount;\n\n  return {\n    product_id: product_id?.id || null,\n    product_uom_qty,\n    price_unit\n  };\n});\n\nconst mergedProducts = Object.values(orderProducts.reduce((acc, product) => {\n  const { product_id, product_uom_qty, price_unit } = product;\n\n  if (!acc[product_id]) {\n    acc[product_id] = {\n      product_id,\n      product_uom_qty: 0,\n      price_unit\n    };\n  };\n  \n  acc[product_id].product_uom_qty += product_uom_qty;\n\n  return acc;\n  }, {})\n);\n\nconst products = mergedProducts.map(item => ([0, 0, { ...item }]));\n\n// Доставка\nproducts.push([0, 0,\n{\n  product_id: 1,\n  product_uom_qty: 1,\n  price_unit: shipPrice\n}]);\n\nreturn {\n  website,\n  products \n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        8368,
+        -2368
+      ],
+      "id": "f1236151-898e-45fb-976a-74384d914c1d",
+      "name": "Order line",
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "resource": "custom",
+        "customResource": "x_acme",
+        "operation": "get",
+        "customResourceId": "4",
+        "options": {
+          "fieldsList": [
+            "x_studio_base_url",
+            "x_studio_user",
+            "x_studio_api",
+            "x_studio_sql_name"
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.odoo",
+      "typeVersion": 1,
+      "position": [
+        -2816,
+        128
+      ],
+      "id": "cb3ac3a7-e78c-4e71-a629-7b5f5ad6338f",
+      "name": "ACME | Odoo",
+      "retryOnFail": true,
+      "maxTries": 5,
+      "waitBetweenTries": 5000,
+      "credentials": {
+        "odooApi": {
+          "id": "",
+          "name": "YOUR_ODOOAPI_CREDENTIAL"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "custom",
+        "customResource": "x_acme",
+        "operation": "get",
+        "customResourceId": "34",
+        "options": {
+          "fieldsList": [
+            "x_studio_password",
+            "x_studio_user",
+            "x_studio_base_url",
+            "x_studio_grant_type"
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.odoo",
+      "typeVersion": 1,
+      "position": [
+        -2592,
+        128
+      ],
+      "id": "48eebeeb-62bc-4f4d-b691-bd48815c9b7f",
+      "name": "ACME | Otto",
+      "retryOnFail": true,
+      "maxTries": 5,
+      "waitBetweenTries": 5000,
+      "credentials": {
+        "odooApi": {
+          "id": "",
+          "name": "YOUR_ODOOAPI_CREDENTIAL"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "f549dcf0-d348-4c71-b74c-557a399a9fb4",
+              "name": "orders",
+              "value": "={{ $json.data.map(item => item.resources)[0] }}",
+              "type": "array"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -1056,
+        0
+      ],
+      "id": "04ea79de-466d-4b11-9f6a-4d69be9580a3",
+      "name": "Orders"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        3536,
+        -2352
+      ],
+      "id": "40e79517-686c-4a97-ab22-141f45d57da1",
+      "name": "Order exists",
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('ACME | Odoo').item.json.x_studio_base_url }}",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n    \"jsonrpc\": \"2.0\",\n    \"method\": \"call\",\n    \"params\": {\n        \"service\": \"object\",\n        \"method\": \"execute_kw\",\n        \"args\": [\n            \"{{ $('ACME | Odoo').item.json.x_studio_sql_name }}\",\n            {{ $('ACME | Odoo').item.json.x_studio_user }},\n            \"{{ $('ACME | Odoo').item.json.x_studio_api }}\",\n            \"sale.order\",\n            \"search_read\",\n            [\n              [\n                [\"x_studio_source_order_number\", \"=\", \"{{ $('Order item').item.json.orderNumber }}\"]\n              ]\n            ],\n            {\n              \"fields\": [\n                \"name\",\n                \"x_studio_source_order_number\",\n                \"state\"\n              ]\n            }\n        ]\n    }\n}\n ",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        3024,
+        -2256
+      ],
+      "id": "9c194c95-8e95-41d7-94e9-0d44360b4956",
+      "name": "Order search",
+      "alwaysOutputData": true,
+      "retryOnFail": true,
+      "maxTries": 5,
+      "waitBetweenTries": 5000,
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('ACME | Odoo').item.json.x_studio_base_url }}",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n    \"jsonrpc\": \"2.0\",\n    \"method\": \"call\",\n    \"params\": {\n        \"service\": \"object\",\n        \"method\": \"execute_kw\",\n        \"args\": [\n            \"{{ $('ACME | Odoo').item.json.x_studio_sql_name }}\",\n            {{ $('ACME | Odoo').item.json.x_studio_user }},\n            \"{{ $('ACME | Odoo').item.json.x_studio_api }}\",\n            \"res.partner\",\n            \"search_read\",\n            [[\n              [\"email\", \"=\", \"{{ $('Addresses').item.json.deliveryAddress.email }}\"]\n            ]],\n            {\n              \"fields\": [\n                \"name\",\n                \"city\",\n                \"street\",\n                \"zip\",\n                \"country_id\",\n                \"email\",\n                \"mobile\",\n                \"lang\"\n              ]\n            }\n        ]\n    }\n}\n ",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        4656,
+        -2464
+      ],
+      "id": "b3b3ff9c-132a-4de7-8842-133a44ba4602",
+      "name": "Get contact",
+      "retryOnFail": true,
+      "maxTries": 5,
+      "waitBetweenTries": 5000,
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "3b91e96c-8ae4-4e54-9f69-6f208b76ca2b",
+              "leftValue": "={{ $json.result }}",
+              "rightValue": "",
+              "operator": {
+                "type": "array",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        4880,
+        -1824
+      ],
+      "id": "21b5137c-1e5e-4e43-ae51-bb6168c1223d",
+      "name": "Main customer exists",
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('ACME | Odoo').item.json.x_studio_base_url }}",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"jsonrpc\": \"2.0\",\n  \"method\": \"call\",\n  \"params\": {\n    \"service\": \"object\",\n    \"method\": \"execute_kw\",\n    \"args\": [\n      \"{{ $('ACME | Odoo').item.json.x_studio_sql_name }}\",\n      {{ $('ACME | Odoo').item.json.x_studio_user }},\n      \"{{ $('ACME | Odoo').item.json.x_studio_api }}\",\n      \"res.partner\",\n      \"search_read\",\n      [[\n        [\"type\", \"=\", \"contact\"],\n        [\"email\", \"=\", \"{{ $('Addresses').item.json.deliveryAddress.email }}\"]\n      ]],\n      {\n        \"fields\": [\n          \"name\",\n          \"city\",\n          \"street\",\n          \"zip\",\n          \"country_id\",\n          \"email\",\n          \"mobile\",\n          \"lang\"\n        ]\n      }\n    ]\n  }\n}\n ",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        4656,
+        -1824
+      ],
+      "id": "23bc9842-5a2f-46ec-b9cb-7285dca6865e",
+      "name": "Find main customer",
+      "retryOnFail": true,
+      "maxTries": 5,
+      "waitBetweenTries": 5000,
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('ACME | Odoo').item.json.x_studio_base_url }}",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"jsonrpc\": \"2.0\",\n  \"method\": \"call\",\n  \"params\": {\n    \"service\": \"object\",\n    \"method\": \"execute_kw\",\n    \"args\": [\n      \"{{ $('ACME | Odoo').item.json.x_studio_sql_name }}\",\n      {{ $('ACME | Odoo').item.json.x_studio_user }},\n      \"{{ $('ACME | Odoo').item.json.x_studio_api }}\",\n      \"res.partner\",\n      \"create\",\n      [\n        {\n          \"type\": \"contact\",\n          \"name\": \"{{ $('Addresses').item.json.deliveryAddress.firstName }} {{ $('Addresses').item.json.deliveryAddress.lastName }}\",\n          \"country_id\": {{ $('Country IDs').item.json.result[0].id }},\n          \"city\": \"{{ $('Addresses').item.json.deliveryAddress.city }}\",\n          \"street\": \"{{ $('Addresses').item.json.deliveryAddress.street }} {{ $('Addresses').item.json.deliveryAddress.houseNumber }}\",\n          \"zip\": \"{{ $('Addresses').item.json.deliveryAddress.zipCode }}\",\n          \"email\": \"{{ $('Addresses').item.json.deliveryAddress.email }}\",\n          \"mobile\": \"{{ $('Addresses').item.json.deliveryAddress.phoneNumber || \"+4942214577700\"}}\",\n          \"lang\": \"{{ $('Addresses').item.json.deliveryAddress.lang }}\"\n        }\n      ]\n    ]\n  }\n}\n",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        5104,
+        -1712
+      ],
+      "id": "e1af3cfb-04ca-43cc-b91f-87bc2ac59f0c",
+      "name": "Create main (delivery) contact",
+      "retryOnFail": true,
+      "maxTries": 5,
+      "waitBetweenTries": 5000,
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('ACME | Odoo').item.json.x_studio_base_url }}",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"jsonrpc\": \"2.0\",\n  \"method\": \"call\",\n  \"params\": {\n    \"service\": \"object\",\n    \"method\": \"execute_kw\",\n    \"args\": [\n      \"{{ $('ACME | Odoo').item.json.x_studio_sql_name }}\",\n      {{ $('ACME | Odoo').item.json.x_studio_user }},\n      \"{{ $('ACME | Odoo').item.json.x_studio_api }}\",\n      \"res.partner\",\n      \"create\",\n      [\n        {\n          \"type\": \"contact\",\n          \"name\": \"{{ $('Addresses').item.json.deliveryAddress.firstName }} {{ $('Addresses').item.json.deliveryAddress.lastName }}\",\n          \"country_id\": {{ $('Country IDs').item.json.result[0].id }},\n          \"city\": \"{{ $('Addresses').item.json.deliveryAddress.city }}\",\n          \"street\": \"{{ $('Addresses').item.json.deliveryAddress.street }} {{ $('Addresses').item.json.deliveryAddress.houseNumber }}\",\n          \"zip\": \"{{ $('Addresses').item.json.deliveryAddress.zipCode }}\",\n          \"email\": \"{{ $('Addresses').item.json.deliveryAddress.email }}\",\n          \"mobile\": \"{{ $('Addresses').item.json.deliveryAddress.phoneNumber || \"+4942214577700\"}}\",\n          \"lang\": \"{{ $('Addresses').item.json.deliveryAddress.lang }}\"\n        }\n      ]\n    ]\n  }\n}\n",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        5104,
+        -2544
+      ],
+      "id": "f3e0f9fc-6412-4bc0-ba51-090273af1ee5",
+      "name": "Create Customer",
+      "retryOnFail": true,
+      "maxTries": 5,
+      "waitBetweenTries": 5000,
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('ACME | Odoo').item.json.x_studio_base_url }}",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"jsonrpc\": \"2.0\",\n  \"method\": \"call\",\n  \"params\": {\n    \"service\": \"object\",\n    \"method\": \"execute_kw\",\n    \"args\": [\n      \"{{ $('ACME | Odoo').item.json.x_studio_sql_name }}\",\n      {{ $('ACME | Odoo').item.json.x_studio_user }},\n      \"{{ $('ACME | Odoo').item.json.x_studio_api }}\",\n      \"res.country\",\n      \"search_read\",\n      [[\n        [\"code\", \"=\", \"{{ $('Addresses').item.json.deliveryAddress.countryCode }}\"]\n      ]],\n      {\n        \"fields\": [\n          \"code\",\n          \"name\"\n        ]\n      }\n    ]\n  }\n}\n ",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        4016,
+        -2144
+      ],
+      "id": "019a393d-ebef-440e-8a25-815dd3509478",
+      "name": "Country IDs",
+      "retryOnFail": true,
+      "maxTries": 5,
+      "waitBetweenTries": 5000,
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('ACME | Odoo').item.json.x_studio_base_url }}",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"jsonrpc\": \"2.0\",\n  \"method\": \"call\",\n  \"params\": {\n    \"service\": \"object\",\n    \"method\": \"execute_kw\",\n    \"args\": [\n      \"{{ $('ACME | Odoo').item.json.x_studio_sql_name }}\",\n      {{ $('ACME | Odoo').item.json.x_studio_user }},\n      \"{{ $('ACME | Odoo').item.json.x_studio_api }}\",\n      \"res.partner\",\n      \"search_read\",\n      [[\n        [\"type\", \"=\", \"invoice\"],\n        [\"email\", \"=\", \"{{ $('Addresses').item.json.invoiceAddress.email }}\"]\n      ]],\n      {\n        \"fields\": [\n          \"name\",\n          \"city\",\n          \"street\",\n          \"zip\",\n          \"country_id\",\n          \"email\",\n          \"mobile\",\n          \"lang\"\n        ]\n      }\n    ]\n  }\n}\n ",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        5552,
+        -1920
+      ],
+      "id": "f7dc52cf-7465-4414-84b9-cd4e4294e2be",
+      "name": "Find secondary customer",
+      "retryOnFail": true,
+      "maxTries": 5,
+      "waitBetweenTries": 5000,
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "199a8323-e2a1-4381-a171-cf2db857fd55",
+              "name": "odoo_main_customer_id",
+              "value": "={{ $('Find main customer').item.json.result[0].id }}",
+              "type": "number"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        5792,
+        -1920
+      ],
+      "id": "89a88de5-4466-4853-a022-8492622681c3",
+      "name": "Set main contact",
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "07877815-da56-4ddd-aa6e-c813aa9024cf",
+              "name": "odoo_main_customer_id",
+              "value": "={{ $json.odoo_main_customer_id || $json.result }}",
+              "type": "number"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        6240,
+        -1712
+      ],
+      "id": "660f5399-3854-4007-91e3-25fa001459b0",
+      "name": "Set main contact1",
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "5decf36d-911c-474c-b71e-d7419b59d753",
+              "name": "odoo_main_customer_id",
+              "value": "={{ $('Find main customer').first().json.result[0].id }}",
+              "type": "number"
+            },
+            {
+              "id": "2f958730-e53b-4cb6-801c-a1facc5fdfc5",
+              "name": "odoo_secondary_customer_id",
+              "value": "={{ $('Find secondary customer').first().json.result[0].id }}",
+              "type": "number"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        6720,
+        -2048
+      ],
+      "id": "77e42d20-dc2a-4eea-bb18-18e61f8e1fe3",
+      "name": "Set both contacts if founded",
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "1c795cf1-ceec-400c-8e77-382c66604b75",
+              "name": "odoo_main_customer_id",
+              "value": "={{ $('Set main contact1').item.json.odoo_main_customer_id }}",
+              "type": "number"
+            },
+            {
+              "id": "b4319d47-e6f7-4944-baac-fba1d971d06c",
+              "name": "odoo_secondary_customer_id",
+              "value": "={{ $json.result }}",
+              "type": "number"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        6720,
+        -1712
+      ],
+      "id": "30038336-785c-423a-9382-e86ce823907b",
+      "name": "Set both contacts",
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "7e602d45-a91a-4550-85a9-a9a85acdeec3",
+              "leftValue": "={{ $json.links.find(item => item.rel === 'next') }}",
+              "rightValue": "next",
+              "operator": {
+                "type": "object",
+                "operation": "notExists",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -1264,
+        272
+      ],
+      "id": "2d45638b-4271-4436-aa80-d6077f30c41a",
+      "name": "If no pagination"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "9393e421-2925-4c46-b61c-6352eda7d98e",
+              "name": "products",
+              "value": "={{ $('Split orders').item.json.positionItems }}",
+              "type": "array"
+            },
+            {
+              "id": "098124de-0405-4b67-b540-dc544a4398d1",
+              "name": "env",
+              "value": "={\n  url: \"{{ $('ACME | Odoo').first().json.x_studio_base_url }}\",\n  db: \"{{ $('ACME | Odoo').first().json.x_studio_sql_name }}\",\n  user: {{ $('ACME | Odoo').first().json.x_studio_user }},\n  api: \"{{ $('ACME | Odoo').first().json.x_studio_api }}\"\n}",
+              "type": "object"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        7920,
+        -2368
+      ],
+      "id": "08c60bc6-9472-4a26-ba76-ec0e8dcbdd15",
+      "name": "Products aggregation",
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "aggregate": "aggregateAllItemData",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.aggregate",
+      "typeVersion": 1,
+      "position": [
+        -1488,
+        128
+      ],
+      "id": "0bbfd3f8-981b-45c3-9171-ce4b3cacecdc",
+      "name": "Collect orders"
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "5,35 * * * *"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -3040,
+        128
+      ],
+      "id": "efc943dd-066a-4445-aab4-fbde030cf337",
+      "name": "Schedule Trigger"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "e44b1e45-c3a7-44a5-af4e-7603c6029fa8",
+              "leftValue": "={{ $json.orderNumber }}",
+              "rightValue": "cbn4p95z62",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            },
+            {
+              "id": "08108650-9fb3-4d6e-bc31-3ccf865589cc",
+              "leftValue": "={{ $json.orderNumber }}",
+              "rightValue": "cbn4rmhndm",
+              "operator": {
+                "type": "string",
+                "operation": "equals",
+                "name": "filter.operator.equals"
+              }
+            }
+          ],
+          "combinator": "or"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -432,
+        -1168
+      ],
+      "id": "187bec81-2564-4ba7-b7f4-3ffcc30a3f54",
+      "name": "Sort existing plenty orders",
+      "disabled": true
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        -192,
+        -1200
+      ],
+      "id": "c9f92ad0-734a-441a-95a5-50b6cecd3603",
+      "name": "Leave plenty orders",
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "0893205c-eb2b-41b0-8a33-c554abd9a873",
+              "leftValue": "={{ $('Get contact').item.json.result[0].name }}",
+              "rightValue": "={{ $('Get contact').item.json.result[0].email }}",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            },
+            {
+              "id": "43dc2b74-bd95-4520-a0ed-3e2d32a4bd3f",
+              "leftValue": "={{ $('Get contact').item.json.result[0].street }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "empty",
+                "singleValue": true
+              }
+            },
+            {
+              "id": "40af7eae-e596-4852-88aa-b72db863407d",
+              "leftValue": "={{ $('Get contact').item.json.result[0].city }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "empty",
+                "singleValue": true
+              }
+            },
+            {
+              "id": "62f9be16-91e1-4179-b987-897b67ae83db",
+              "leftValue": "={{ $('Get contact').item.json.result[0].zip }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "empty",
+                "singleValue": true
+              }
+            },
+            {
+              "id": "5a9ba389-4d6a-4f24-9616-987af52f06fc",
+              "leftValue": "={{ $('Get contact').item.json.result[0].country_id }}",
+              "rightValue": "",
+              "operator": {
+                "type": "array",
+                "operation": "empty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "or"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        5104,
+        -2384
+      ],
+      "id": "a66ca979-a32e-41df-bdfb-0786de0999d3",
+      "name": "If address fields not empty",
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('ACME | Odoo').item.json.x_studio_base_url }}",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"jsonrpc\": \"2.0\",\n  \"method\": \"call\",\n  \"params\": {\n    \"service\": \"object\",\n    \"method\": \"execute_kw\",\n    \"args\": [\n      \"{{ $('ACME | Odoo').item.json.x_studio_sql_name }}\",\n      {{ $('ACME | Odoo').item.json.x_studio_user }},\n      \"{{ $('ACME | Odoo').item.json.x_studio_api }}\",\n      \"res.partner\",\n      \"write\",\n      [\n        [{{ $('Get contact').item.json.result[0].id }}],\n        {\n          \"name\": \"{{ $('Addresses').item.json.deliveryAddress.firstName }} {{ $('Addresses').item.json.deliveryAddress.lastName }}\",\n          \"country_id\": {{ $('Country IDs').item.json.result[0].id }},\n          \"city\": \"{{ $('Addresses').item.json.deliveryAddress.city }}\",\n          \"street\": \"{{ $('Addresses').item.json.deliveryAddress.street }} {{ $('Addresses').item.json.deliveryAddress.houseNumber }}\",\n          \"zip\": \"{{ $('Addresses').item.json.deliveryAddress.zipCode }}\",\n          \"email\": \"{{ $('Addresses').item.json.deliveryAddress.email }}\",\n          \"mobile\": \"{{ $('Addresses').item.json.deliveryAddress.phoneNumber || \"+4942214577700\"}}\",\n          \"lang\": \"{{ $('Addresses').item.json.deliveryAddress.lang }}\"\n        }\n      ]\n    ]\n  }\n}\n",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        5328,
+        -2272
+      ],
+      "id": "b622d515-2205-41f7-9c9a-4506735b869c",
+      "name": "Edit Customer",
+      "retryOnFail": true,
+      "maxTries": 5,
+      "waitBetweenTries": 5000,
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "0893205c-eb2b-41b0-8a33-c554abd9a873",
+              "leftValue": "={{ $('Find main customer').item.json.result[0].name }}",
+              "rightValue": "={{ $('Find main customer').item.json.result[0].email }}",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            },
+            {
+              "id": "43dc2b74-bd95-4520-a0ed-3e2d32a4bd3f",
+              "leftValue": "={{ $('Find main customer').item.json.result[0].street }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "empty",
+                "singleValue": true
+              }
+            },
+            {
+              "id": "40af7eae-e596-4852-88aa-b72db863407d",
+              "leftValue": "={{ $('Find main customer').item.json.result[0].city }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "empty",
+                "singleValue": true
+              }
+            },
+            {
+              "id": "62f9be16-91e1-4179-b987-897b67ae83db",
+              "leftValue": "={{ $('Find main customer').item.json.result[0].zip }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "empty",
+                "singleValue": true
+              }
+            },
+            {
+              "id": "5a9ba389-4d6a-4f24-9616-987af52f06fc",
+              "leftValue": "={{ $('Find main customer').item.json.result[0].country_id }}",
+              "rightValue": "",
+              "operator": {
+                "type": "array",
+                "operation": "empty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "or"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        5104,
+        -1936
+      ],
+      "id": "25850ebd-6f1c-4c48-b51e-84badabf418e",
+      "name": "If main contact fields not empty",
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('ACME | Odoo').item.json.x_studio_base_url }}",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"jsonrpc\": \"2.0\",\n  \"method\": \"call\",\n  \"params\": {\n    \"service\": \"object\",\n    \"method\": \"execute_kw\",\n    \"args\": [\n      \"{{ $('ACME | Odoo').item.json.x_studio_sql_name }}\",\n      {{ $('ACME | Odoo').item.json.x_studio_user }},\n      \"{{ $('ACME | Odoo').item.json.x_studio_api }}\",\n      \"res.partner\",\n      \"write\",\n      [\n        [{{ $('Find main customer').item.json.result[0].id }}],\n        {\n          \"name\": \"{{ $('Addresses').item.json.deliveryAddress.firstName }} {{ $('Addresses').item.json.deliveryAddress.lastName }}\",\n          \"country_id\": {{ $('Country IDs').item.json.result[0].id }},\n          \"city\": \"{{ $('Addresses').item.json.deliveryAddress.city }}\",\n          \"street\": \"{{ $('Addresses').item.json.deliveryAddress.street }} {{ $('Addresses').item.json.deliveryAddress.houseNumber }}\",\n          \"zip\": \"{{ $('Addresses').item.json.deliveryAddress.zipCode }}\",\n          \"email\": \"{{ $('Addresses').item.json.deliveryAddress.email }}\",\n          \"mobile\": \"{{ $('Addresses').item.json.deliveryAddress.phoneNumber || \"+4942214577700\"}}\",\n          \"lang\": \"{{ $('Addresses').item.json.deliveryAddress.lang }}\"\n        }\n      ]\n    ]\n  }\n}\n",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        5328,
+        -2032
+      ],
+      "id": "7c2694bc-1b6c-434c-8cee-268859544509",
+      "name": "Edit main customer",
+      "retryOnFail": true,
+      "maxTries": 5,
+      "waitBetweenTries": 5000,
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "f19d7fd9-457c-41c1-93f8-5e82df9a4850",
+              "leftValue": "",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "equals",
+                "name": "filter.operator.equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        6240,
+        -2064
+      ],
+      "id": "170f379d-56a0-4723-a949-4fb0d6ad2c3f",
+      "name": "If secondary contact fields not empty",
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('ACME | Odoo').item.json.x_studio_base_url }}",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"jsonrpc\": \"2.0\",\n  \"method\": \"call\",\n  \"params\": {\n    \"service\": \"object\",\n    \"method\": \"execute_kw\",\n    \"args\": [\n      \"{{ $('ACME | Odoo').item.json.x_studio_sql_name }}\",\n      {{ $('ACME | Odoo').item.json.x_studio_user }},\n      \"{{ $('ACME | Odoo').item.json.x_studio_api }}\",\n      \"res.partner\",\n      \"write\",\n      [\n        [{{ $('Find secondary customer').item.json.result[0].id }}],\n        {\n          \"parent_id\": {{ $('Find main customer').item.json.result[0].id }},\n          \"name\": \"{{ $('Addresses').item.json.invoiceAddress.firstName }} {{ $('Addresses').item.json.invoiceAddress.lastName }}\",\n          \"country_id\": {{ $('Country IDs').item.json.result[0].id }},\n          \"city\": \"{{ $('Addresses').item.json.invoiceAddress.city }}\",\n          \"street\": \"{{ $('Addresses').item.json.invoiceAddress.street }} {{ $('Addresses').item.json.invoiceAddress.houseNumber }}\",\n          \"zip\": \"{{ $('Addresses').item.json.invoiceAddress.zipCode }}\",\n          \"email\": \"{{ $('Addresses').item.json.invoiceAddress.email }}\",\n          \"mobile\": \"{{ $('Addresses').item.json.invoiceAddress.phoneNumber || \"+4942214577700\"}}\",\n          \"lang\": \"{{ $('Addresses').item.json.invoiceAddress.lang }}\"\n        }\n      ]\n    ]\n  }\n}\n",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        6480,
+        -2144
+      ],
+      "id": "fed50342-85fe-43e8-a765-fb2cf5158c70",
+      "name": "Edit secondary customer",
+      "retryOnFail": true,
+      "maxTries": 5,
+      "waitBetweenTries": 5000,
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "dataToSave": {
+          "values": [
+            {
+              "key": "source",
+              "value": "={{ $('Order item').item.json.orderNumber }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.executionData",
+      "typeVersion": 1.1,
+      "position": [
+        3536,
+        -2144
+      ],
+      "id": "5415bcf2-2644-4fa5-b908-570337cc0ac7",
+      "name": "Log",
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "e27a3fe8-8c0e-4552-8840-38dc5a7fffc5",
+              "name": "odoo_main_customer_id",
+              "value": "={{ $('Create Customer').item.json.result }}",
+              "type": "number"
+            },
+            {
+              "id": "5c8283a8-6854-46ee-b87f-bf363fc802a5",
+              "name": "odoo_secondary_customer_id",
+              "value": "={{ $('Create Customer').item.json.result }}",
+              "type": "number"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        5328,
+        -2544
+      ],
+      "id": "a8cd11a3-97d3-40dd-a446-4b3403600649",
+      "name": "New customer id",
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "b852e501-b658-4471-9911-212dba1901a3",
+              "name": "odoo_main_customer_id",
+              "value": "={{ $('Get contact').item.json.result[0].id\n}}",
+              "type": "number"
+            },
+            {
+              "id": "85d88f6c-01a3-40d3-ad3a-4d8bc8d6172d",
+              "name": "odoo_secondary_customer_id",
+              "value": "={{ $('Get contact').item.json.result[0].id }}",
+              "type": "number"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        5552,
+        -2368
+      ],
+      "id": "742507dc-b837-4575-9bd6-53f8f59701c1",
+      "name": "Exist customer id",
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('ACME | Odoo').item.json.x_studio_base_url }}",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"jsonrpc\": \"2.0\",\n  \"method\": \"call\",\n  \"params\": {\n    \"service\": \"object\",\n    \"method\": \"execute_kw\",\n    \"args\": [\n      \"{{ $('ACME | Odoo').item.json.x_studio_sql_name }}\",\n      {{ $('ACME | Odoo').item.json.x_studio_user }},\n      \"{{ $('ACME | Odoo').item.json.x_studio_api }}\",\n      \"sale.order\",\n      \"create\",\n      [\n        {\n          \"state\": \"sale\",\n          \"date_order\": \"{{ DateTime.fromFormat($('Split orders').item.json.orderDate, \"yyyy-MM-dd'T'HH:mm:ss.SSS+0000\").toFormat('yyyy-MM-dd HH:mm:ss') }}\",\n          \"website_id\": {{ $json.website }},\n          \"partner_id\": {{ $('Order data').item.json.odoo_main_customer_id }},\n          \"partner_shipping_id\": {{ $('Order data').item.json.odoo_main_customer_id }},\n          \"partner_invoice_id\": {{ $('Order data').item.json.odoo_secondary_customer_id }},\n          \"x_studio_source_order_number\": \"{{ $('Split orders').item.json.orderNumber }}\",\n          \"order_line\": {{ JSON.stringify($json.products) }}\n        }\n      ],\n      {\n        \"context\": {\n          \"allowed_company_ids\": [1, 2]\n        }\n      }\n    ]\n  }\n}\n",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        8928,
+        -2352
+      ],
+      "id": "bb832072-e91b-4acd-bf0c-84ef32e8c37d",
+      "name": "Order Creation",
+      "retryOnFail": false,
+      "maxTries": 5,
+      "waitBetweenTries": 5000,
+      "disabled": true
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        9344,
+        -2256
+      ],
+      "id": "83a84a01-36bb-40db-9c9a-b1f7ac6fed48",
+      "name": "Exit",
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "errorMessage": "Error was founded!"
+      },
+      "type": "n8n-nodes-base.stopAndError",
+      "typeVersion": 1,
+      "position": [
+        9344,
+        -2448
+      ],
+      "id": "583cb899-a116-4ab1-8933-31c8ff484c6b",
+      "name": "Error was founded",
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "217c3460-da69-4a25-be4c-04c7250fe1c1",
+              "leftValue": "={{ $json.error }}",
+              "rightValue": "",
+              "operator": {
+                "type": "object",
+                "operation": "exists",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        9136,
+        -2352
+      ],
+      "id": "fd362684-c7d2-483c-b957-e10b3b869623",
+      "name": "If error",
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        -336,
+        -96
+      ],
+      "id": "cf15db43-4ede-4d35-a605-b49046eb79f8",
+      "name": "Order item"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "9639ce9b-90d4-4f13-9724-f0f60034fa84",
+              "name": "x_studio_base_url",
+              "value": "={{ $('ACME | Odoo').item.json.x_studio_base_url }}",
+              "type": "string"
+            },
+            {
+              "id": "a16eb141-c795-46c9-9428-618099498470",
+              "name": "x_studio_sql_name",
+              "value": "={{ $('ACME | Odoo').item.json.x_studio_sql_name }}",
+              "type": "string"
+            },
+            {
+              "id": "d1037f96-b8bc-4578-9325-3c6b1dbf0760",
+              "name": "x_studio_user",
+              "value": "={{ $('ACME | Odoo').item.json.x_studio_user }}",
+              "type": "string"
+            },
+            {
+              "id": "25ac3ce1-11f5-4986-b7bc-c13bce13224e",
+              "name": "x_studio_api",
+              "value": "={{ $('ACME | Odoo').item.json.x_studio_api }}",
+              "type": "string"
+            },
+            {
+              "id": "eb711dd8-80d5-4c20-81f1-94b95c419f3c",
+              "name": "orderNumber",
+              "value": "={{ $('Order item').item.json.orderNumber }}",
+              "type": "string"
+            },
+            {
+              "id": "ceec561c-3f3f-452f-b473-a760d43e5a9c",
+              "name": "deliveryAddress",
+              "value": "={{ $('Order item').item.json.deliveryAddress }}",
+              "type": "object"
+            },
+            {
+              "id": "b6e57901-5919-4044-8f90-821517c6748a",
+              "name": "invoiceAddress",
+              "value": "={{ $('Order item').item.json.invoiceAddress }}",
+              "type": "object"
+            },
+            {
+              "id": "e40a5eca-4449-4a97-89dc-73190c055ca5",
+              "name": "positionItems",
+              "value": "={{ $('Order item').item.json.positionItems }}",
+              "type": "array"
+            },
+            {
+              "id": "14e1db39-3319-4d54-8422-047237a04141",
+              "name": "initialDeliveryFees",
+              "value": "={{ $('Order item').item.json.initialDeliveryFees }}",
+              "type": "array"
+            },
+            {
+              "id": "fdcda926-b973-452d-a5d3-9dfc4a88ba49",
+              "name": "orderDate",
+              "value": "={{ $('Order item').item.json.orderDate }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -128,
+        0
+      ],
+      "id": "25f7cae0-864b-4940-b097-5b139d16d131",
+      "name": "Creds data for subflow"
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "nAj1u7qdXyxJY74H",
+          "mode": "list",
+          "cachedResultUrl": "/workflow/<WORKFLOW_ID>",
+          "cachedResultName": "[ Otto ] - Get Otto orders SUBFLOW"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "mode": "each",
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        80,
+        0
+      ],
+      "id": "e3234762-514a-421a-865c-b10777417438",
+      "name": "Call '[ Otto ] - Get Otto orders SUBFLOW'",
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        -128,
+        -192
+      ],
+      "id": "4d45e0cf-a18d-4d01-8d90-e2d13b200329",
+      "name": "Finish"
+    }
+  ],
+  "connections": {
+    "Get Otto token": {
+      "main": [
+        [
+          {
+            "node": "Pagination data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait": {
+      "main": [
+        []
+      ]
+    },
+    "Pagination data": {
+      "main": [
+        [
+          {
+            "node": "Get Otto orders",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Pagination continue": {
+      "main": [
+        [
+          {
+            "node": "Wait",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Otto orders": {
+      "main": [
+        [
+          {
+            "node": "Collect orders",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If order exists": {
+      "main": [
+        [
+          {
+            "node": "Order exists",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Log",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If similar address": {
+      "main": [
+        [
+          {
+            "node": "Get contact",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Find main customer",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Addresses": {
+      "main": [
+        [
+          {
+            "node": "Country IDs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Invoice Contact": {
+      "main": [
+        [
+          {
+            "node": "Set both contacts",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If orders got": {
+      "main": [
+        [
+          {
+            "node": "Split orders",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "No orders",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Order data": {
+      "main": [
+        [
+          {
+            "node": "Products aggregation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If invoice contact": {
+      "main": [
+        [
+          {
+            "node": "If secondary contact fields not empty",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Set main contact1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If contact doesn't exist": {
+      "main": [
+        [
+          {
+            "node": "Create Customer",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "If address fields not empty",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Odoo IDs": {
+      "main": [
+        [
+          {
+            "node": "Order line",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split orders": {
+      "main": [
+        [
+          {
+            "node": "Order item",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Order line": {
+      "main": [
+        []
+      ]
+    },
+    "ACME | Odoo": {
+      "main": [
+        [
+          {
+            "node": "ACME | Otto",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "ACME | Otto": {
+      "main": [
+        [
+          {
+            "node": "Get Otto token",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Orders": {
+      "main": [
+        [
+          {
+            "node": "If orders got",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Order search": {
+      "main": [
+        [
+          {
+            "node": "If order exists",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get contact": {
+      "main": [
+        [
+          {
+            "node": "If contact doesn't exist",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Main customer exists": {
+      "main": [
+        [
+          {
+            "node": "If main contact fields not empty",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Create main (delivery) contact",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Find main customer": {
+      "main": [
+        [
+          {
+            "node": "Main customer exists",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create main (delivery) contact": {
+      "main": [
+        [
+          {
+            "node": "Set main contact1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Customer": {
+      "main": [
+        [
+          {
+            "node": "New customer id",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Country IDs": {
+      "main": [
+        [
+          {
+            "node": "If similar address",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Find secondary customer": {
+      "main": [
+        [
+          {
+            "node": "Set main contact",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set main contact": {
+      "main": [
+        [
+          {
+            "node": "If invoice contact",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set main contact1": {
+      "main": [
+        [
+          {
+            "node": "Create Invoice Contact",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set both contacts if founded": {
+      "main": [
+        [
+          {
+            "node": "Order data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set both contacts": {
+      "main": [
+        [
+          {
+            "node": "Order data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If no pagination": {
+      "main": [
+        [],
+        [
+          {
+            "node": "Pagination continue",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Products aggregation": {
+      "main": [
+        [
+          {
+            "node": "Get Odoo IDs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Collect orders": {
+      "main": [
+        [
+          {
+            "node": "Orders",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "ACME | Odoo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Sort existing plenty orders": {
+      "main": [
+        [
+          {
+            "node": "Leave plenty orders",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    },
+    "If address fields not empty": {
+      "main": [
+        [
+          {
+            "node": "Edit Customer",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Exist customer id",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Customer": {
+      "main": [
+        [
+          {
+            "node": "Exist customer id",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If main contact fields not empty": {
+      "main": [
+        [
+          {
+            "node": "Edit main customer",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Find secondary customer",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit main customer": {
+      "main": [
+        [
+          {
+            "node": "Find secondary customer",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If secondary contact fields not empty": {
+      "main": [
+        [
+          {
+            "node": "Edit secondary customer",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Set both contacts if founded",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit secondary customer": {
+      "main": [
+        [
+          {
+            "node": "Set both contacts if founded",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log": {
+      "main": [
+        [
+          {
+            "node": "Addresses",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "New customer id": {
+      "main": [
+        [
+          {
+            "node": "Order data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Exist customer id": {
+      "main": [
+        [
+          {
+            "node": "Order data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Order Creation": {
+      "main": [
+        [
+          {
+            "node": "If error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If error": {
+      "main": [
+        [
+          {
+            "node": "Error was founded",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Exit",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Order item": {
+      "main": [
+        [
+          {
+            "node": "Finish",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Creds data for subflow",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Creds data for subflow": {
+      "main": [
+        [
+          {
+            "node": "Call '[ Otto ] - Get Otto orders SUBFLOW'",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Call '[ Otto ] - Get Otto orders SUBFLOW'": {
+      "main": [
+        [
+          {
+            "node": "Order item",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": false
+  }
+}

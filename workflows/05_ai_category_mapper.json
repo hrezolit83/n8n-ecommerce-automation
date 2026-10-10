@@ -1,0 +1,626 @@
+{
+  "name": "AI Category Mapper: product -> marketplace category tree (LLM + structured output)",
+  "nodes": [
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const data = $json.values_lists[0].values;\nconst allowColors = data.map(value => value.label).join(', '); // Об'єднуємо всі label в один рядок\nreturn { allowColors };\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        384,
+        496
+      ],
+      "id": "2f0bb8b8-2910-4b99-9d9c-79df5dcc8f24",
+      "name": "take only names color"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=You are a marketplace category manager, your task is to choose the right category for product placement on the marketplace Adeo.\nHere is the website of this store - https://www.adeo.com/uk/",
+        "hasOutputParser": true,
+        "options": {
+          "systemMessage": "=This is the product full name: {{ $('get items odoo').first().json.result[0].name }}\nThis is the short name: {{ $('get items odoo').first().json.result[0].x_studio_name_3 }}\nThis is the description: \n{{ $('get items odoo').first().json.result[0].x_studio_description_unique.replace(/<[^>]*>/g, '') }}\n\nProduct image: {{ $('Input').first().json.product.media_1 }}\n\nProvided color: {{ $('get items odoo').first().json.result[0].feed_color }}\n\nAllowed colors: [{{ $('take only names color').first().json.allowColors }}]\n\nBelow is the list of allowed categories.\nEach category has:\n\n- \"path\" — the category path.\n- \"id\" — the category id\n\n⚠️ VERY IMPORTANT:\n* Once you find the proper category, you MUST return the FULL category path EXACTLY as shown in the list.\n* DO NOT shorten, cut, or remove any part of the path.\n* The returned \"path\" must match one of the provided \"path\" values character by character, including all \"/\" separators and the last leaf category.\n* If you output only part of the path (for example, stopping before the last element), the result will be INVALID.\n\nList of available categories:\n{{ $('Filter Categories').first().json.filtered.length > 0\n    ? JSON.stringify($('Filter Categories').first().json.filtered, null, 2)\n    : JSON.stringify($('Patch Categories').first().json.result, null, 2) }}\n\n\n\n\n---\n\nYour task:\nChoose exactly one category from this list that is a valid leaf category.\n\nRules:\n1. Return the matching \"path\" exactly as in the list and \"id\".\n2. Choose \"color\" from the allowed list. If no color matches, return \"Not available\".\n3. If no category matches perfectly, choose the closest correct category from the list, still returning its path exactly as written.\n\nSTRICT RULES:\n- DO NOT create new categories.\n- ONLY use categories from the list.\n- DO NOT cut or trim category paths. Copy and return them exactly as provided in the list.\n\n---\n\nReturn JSON in this exact format:\n\n{\n  \"id\": \"CATEGORY ID\",\n  \"path\": \"CATEGORY PATH EXACTLY AS IN LIST\",\n  \"color\": \"COLOR FROM LIST or 'Not available'\"\n}\n"
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1.7,
+      "position": [
+        560,
+        496
+      ],
+      "id": "ee445ac7-f7d7-4de8-b02f-80ba937378a3",
+      "name": "categ, dev_type, color",
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "mode": "raw",
+        "jsonOutput": "{\n  \"adeoCategoryUrll\": \"https://adeo-marketplace.mirakl.net/api/hierarchies\",\n  \"API\": \"<REDACTED>\",\n  \"shop_id\": \"6026\"\n}\n",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        160,
+        0
+      ],
+      "id": "84a720d2-86fd-4a41-ad0d-e74afd6ecef7",
+      "name": "Set Params Adeo"
+    },
+    {
+      "parameters": {
+        "url": "={{ $('Set Params Adeo').first().json.adeoCategoryUrll }}",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "shop_id",
+              "value": "={{ $('Set Params Adeo').first().json.shop_id }}"
+            }
+          ]
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "={{ $('Set Params Adeo').first().json.API }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        384,
+        224
+      ],
+      "id": "4bde2e60-754c-4545-a6bd-866c58304332",
+      "name": "Get categories Adeo",
+      "retryOnFail": true,
+      "waitBetweenTries": 4000
+    },
+    {
+      "parameters": {
+        "jsCode": "const originalData = $input.all();\n\n// Видаляємо label_translations\nconst transformedData = originalData.map(item => {\n  return item.json.hierarchies.map(hierarchy => {\n    const { label_translations, ...rest } = hierarchy;\n    return rest;\n  });\n});\n\n// Розплющуємо всі ієрархії в один масив\nconst inputJson = transformedData.flat();\n\n// Створюємо мапу категорій\nconst categoriesMap = {};\ninputJson.forEach(category => {\n  categoriesMap[category.code] = category;\n});\n\n// Шукаємо всі parent-коди\nconst parentCodes = new Set(\n  inputJson\n    .map(category => category.parent_code)\n    .filter(code => !!code)\n);\n\n// Побудова шляху\nfunction createCategoryPath(categoryCode) {\n  let category = categoriesMap[categoryCode];\n  let path = [];\n\n  while (category) {\n    path.unshift(category.label);\n    category = categoriesMap[category.parent_code];\n  }\n\n  return path.join(' / ');\n}\n\n// Лише leaf-категорії\nconst leafCategories = inputJson\n  .filter(category => !parentCodes.has(category.code))\n  .map(category => ({\n    code: category.code,\n    path: createCategoryPath(category.code)\n  }))\n  .filter(item => item.path.split(' / ').length > 2);\n\n// Додаємо id починаючи з 1\nconst result = leafCategories.map((item, index) => ({\n  id: index + 1,\n  ...item\n}));\n\nreturn { result };\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        560,
+        224
+      ],
+      "id": "a5e15227-0b20-42d2-8cde-ae5e2e1a9263",
+      "name": "Patch Categories"
+    },
+    {
+      "parameters": {
+        "url": "=https://adeo-marketplace.mirakl.net/api/values_lists",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "shop_id",
+              "value": "={{ $('Set Params Adeo').first().json.shop_id }}"
+            },
+            {
+              "name": "code",
+              "value": "ATT_10837"
+            }
+          ]
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "={{ $('Set Params Adeo').first().json.API }}"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        224,
+        496
+      ],
+      "id": "0a8cb9fa-8e6b-434a-aa46-9fb039792ecd",
+      "name": "Get Color List",
+      "retryOnFail": true,
+      "waitBetweenTries": 4000,
+      "alwaysOutputData": true,
+      "executeOnce": true,
+      "notesInFlow": false
+    },
+    {
+      "parameters": {
+        "inputSource": "passthrough"
+      },
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        0,
+        0
+      ],
+      "id": "10b70051-43d8-4960-bec4-0da6511751ee",
+      "name": "Input"
+    },
+    {
+      "parameters": {
+        "mode": "raw",
+        "jsonOutput": "{\n  \"odoo_name_sql\": \"your_odoo_db\",\n  \"odoo_id_user_api\": 2,\n  \"odoo_api\": \"<REDACTED>\",\n  \"odoProdUrl\": \"https://your-instance.example.com/jsonrpc\",\n  \"odoStageUrl\": \"https://your-instance.example.com/jsonrpc\"\n}\n",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        320,
+        0
+      ],
+      "id": "5f571603-cb9f-4604-baaa-8375ff4204b6",
+      "name": "Api Odoo"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('Api Odoo').first().json.odoProdUrl }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n    \"jsonrpc\": \"2.0\",\n    \"method\": \"call\",\n    \"params\": {\n        \"service\": \"object\",\n        \"method\": \"execute_kw\",\n        \"args\": [\n            \"{{ $('Api Odoo').first().json.odoo_name_sql }}\",\n            \"{{ $('Api Odoo').first().json.odoo_id_user_api }}\",\n            \"{{ $('Api Odoo').first().json.odoo_api }}\",\n            \"product.template\",\n            \"search_read\",\n            [\n                [\n                    [\"id\", \"=\", {{ $('Input').last().json.addValues.productId }}]\n                ]\n            ],\n            {\n                \"fields\": [\n                  \"name\",\n                  \"x_studio_name_3\",\n                  \"website_meta_title\",\n                  \"x_studio_description_unique\",\n                  \"feed_color\",\n                  \"public_categ_ids\"\n                ],\n                \"context\": {\n                    \"lang\": \"en_US\"\n                }\n            }\n        ]\n    }\n}\n ",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        496,
+        0
+      ],
+      "id": "504a463d-0fee-49f6-8849-1a3b151d9c71",
+      "name": "get items odoo",
+      "retryOnFail": true,
+      "waitBetweenTries": 4000,
+      "executeOnce": true
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const output = $json.output;\n\n// Перевіряємо, чи є дані\nif (!output || Object.keys(output).length === 0) {\n  return { data: {} };\n}\n\nconst data = output;\nconst allowedListCat = $('Patch Categories').first().json.result || [];\n\n// Знаходимо категорію по id (приводимо до числа)\nconst found = allowedListCat.find(item => Number(item.id) === Number(data.id));\n\nif (found) {\n  data.code = found.code;\n  data.path = found.path;\n}\n\n\nreturn { category: data };\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        864,
+        496
+      ],
+      "id": "c77319e0-f248-451f-b72d-74c6e8400b27",
+      "name": "output 1"
+    },
+    {
+      "parameters": {
+        "schemaType": "manual",
+        "inputSchema": "{\n  \"id\": \"id\",\n  \"path\": \"path\",\n  \"color\": \"color\"\n}",
+        "autoFix": true
+      },
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "typeVersion": 1.2,
+      "position": [
+        736,
+        672
+      ],
+      "id": "c4995347-6102-46a6-bb9a-4830f0ce976e",
+      "name": "Structured Output Parser1"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "b5778874-4c3d-40de-bce0-ed0789490491",
+              "name": "code",
+              "value": "={{ $json.category.code }}",
+              "type": "string"
+            },
+            {
+              "id": "bfcc99ae-09bc-4dc7-a549-05323400c3bf",
+              "name": "path",
+              "value": "={{ $json.category.path }}",
+              "type": "string"
+            },
+            {
+              "id": "d10e75a0-16ab-4e5c-b886-f7a3a28be30c",
+              "name": "color",
+              "value": "={{ $json.category.color }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1296,
+        224
+      ],
+      "id": "2334bbff-bf2f-4f72-8793-3d05af48c613",
+      "name": "Cat Ref data1"
+    },
+    {
+      "parameters": {
+        "jsCode": "const result = $input.first().json.result;\n\nif (!result || result.length === 0) {\n  return [{ categories_name: \"\" }];\n}\n\nlet categories = result.map(item => ({\n  name: item.name,\n  parent_name: item.parent_id !== false ? item.parent_id[1] : \"\",\n  prarents_and_self: item.parents_and_self,\n  length: item.parents_and_self.length\n})).sort((a, b) => b.length - a.length);\n\nlet categories_name = categories[0];\n\nlet replace_name = result.find(f => f.parent_id === false)?.name + \" / \";\n\nreturn [{\n  categories_name: categories_name.parent_name.replace(replace_name, \"\") + \" / \" + categories_name.name\n}];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        208,
+        224
+      ],
+      "id": "072cac7e-c644-427a-ab6b-333526ab9ff1",
+      "name": "full categories route"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('Api Odoo').first().json.odoProdUrl }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json; charset=utf-8",
+        "body": "={\n    \"jsonrpc\": \"2.0\",\n    \"method\": \"call\",\n    \"params\": {\n        \"service\": \"object\",\n        \"method\": \"execute_kw\",\n        \"args\": [\n            \"{{ $('Api Odoo').first().json.odoo_name_sql }}\",\n            {{ $('Api Odoo').first().json.odoo_id_user_api }},\n            \"{{ $('Api Odoo').first().json.odoo_api }}\",\n            \"product.public.category\",\n            \"search_read\",\n            [ \n                [ \n                    [\"id\", \"in\", [{{ $('get items odoo').first().json.result[0].public_categ_ids }}]]\n                ] \n            ],\n            {\n                \"fields\": [\n                    \"id\",\n                    \"name\",\n                    \"parent_id\",\n                    \"parents_and_self\"\n                ]\n            }\n        ]\n    }\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        32,
+        224
+      ],
+      "id": "916fcb11-6eaf-4a55-b603-c84417db7441",
+      "name": "get categories name",
+      "retryOnFail": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const categoriesFromAdeo = $input.first().json.result;\nconst ctagoryFromOdoo = $('full categories route').first().json.categories_name?.trim() || \"\";\n\n// Якщо categories_name пустий або \".\", то повертаємо весь список\nif (!ctagoryFromOdoo || ctagoryFromOdoo === \".\") {\n  return {filtered: categoriesFromAdeo};\n}\n\n// список стоп-слів\nconst stopWords = [\"and\", \"or\", \"vj\", \"of\", \"for\", \"the\", \"then\", \"a\", \"an\", \"to\"];\n\n// функція: отримати перше слово після певного символу\nfunction getFirstWordAfter(str, delimiter) {\n  const part = str.split(delimiter).pop()?.trim() || \"\";\n  return part.split(/[\\/\\s]+/)[0]?.toLowerCase() || \"\";\n}\n\n// 1️⃣ беремо слово після останнього \"/\"\nlet searchWord = getFirstWordAfter(ctagoryFromOdoo, \"/\");\n\n// фільтруємо категорії\nlet filtered = [];\nif (searchWord && !stopWords.includes(searchWord)) {\n  const rx = new RegExp(`\\\\b${searchWord}\\\\b`, \"i\");\n  filtered = categoriesFromAdeo.filter(cat => rx.test(cat.path.toLowerCase()));\n}\n\n// 2️⃣ якщо нічого не знайшли → шукаємо слово після \"->\" (але тільки після останнього \"/\")\nif (filtered.length === 0 && ctagoryFromOdoo.includes(\"->\")) {\n  const afterSlash = ctagoryFromOdoo.split(\"/\").pop() || \"\";\n  const afterArrow = afterSlash.split(\"->\").pop()?.trim() || \"\";\n  const fallbackWord = afterArrow.split(/[\\/\\s]+/)[0]?.toLowerCase() || \"\";\n\n  if (fallbackWord && !stopWords.includes(fallbackWord)) {\n    const rx2 = new RegExp(`\\\\b${fallbackWord}\\\\b`, \"i\");\n    filtered = categoriesFromAdeo.filter(cat => rx2.test(cat.path.toLowerCase()));\n  }\n}\n\nreturn {filtered: filtered};\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        720,
+        224
+      ],
+      "id": "10c4e646-dd7c-4bb5-ba42-5585dcddb8d0",
+      "name": "Filter Categories",
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const name = ($input.first().json.result[0].name || \"\").toLowerCase();\n\nconst rules = [\n  {\n    keywords: [\"Bird Food\", \"Bird Seed\", \"Suet for Birds\", \"Bird\"],\n    category: {\n      path: \"Garden & Terrace / Pet Shop / Bird / Bird Food\",\n      code: \"205123|2795|R09-003-1501\",\n      color: \"Not available\",\n    }\n  },\n  {\n    keywords: [\"beer dispenser\", \"beer\"],\n    category: {\n      path: \"Home appliances / Small household appliances - preparation of drinks / Beer tap\",\n      code: \"205948|1015|R1001-1001\",\n      color: \"Not available\",\n    }\n  },\n  {\n    keywords: [\"coffee\"],\n    category: {\n      path: \"Home appliances / Small household appliances - preparation of drinks / Coffee maker and coffee machine / Espresso coffee machine\",\n      code: \"206057|1006|R1001-1001-1001\",\n      color: \"Not available\",\n    }\n  },\n  {\n    keywords: [\"glasses\", \"glass\", \"carafe\"],\n    category: {\n      path: \"Kitchen / Kitchen accessories and utensil / Mug and glass\",\n      code: \"205785|2195|R05-007\",\n      color: \"Not available\",\n    }\n  },\n  {\n    keywords: [\"Shaker\", \"Cocktail Mix Set\", \"Wine Pourer\"],\n    category: {\n      path: \"Kitchen / Kitchen accessories and utensil / Kitchen utensils / Kitchen utensils\",\n      code: \"205016|2393|R05-007-2016\",\n      color: \"Not available\",\n    }\n  },\n  {\n    keywords: [\"Brew Kettle\", \"Mash Kettle\", \"Copper pot\", \"cauldron\", \"pot\"],\n    category: {\n      path: \"Kitchen / Kitchen accessories and utensil / Cooking pot\",\n      code: \"205731|2079|R05-007\",\n      color: \"Not available\",\n    }\n  },\n  {\n    keywords: [\"frying pan\", \"frypan\"],\n    category: {\n      path: \"Kitchen / Kitchen accessories and utensil / Frying pan\",\n      code: \"205737|2078|R05-007\",\n      color: \"Not available\",\n    }\n  },\n  {\n    keywords: [\"Waterproof Tarp\", \"Waterproof tarpaulin\"],\n    category: {\n      path: \"Materials / Waterproofing and protection / Provisional protection / Tarpaulin and protection\",\n      code: \"200034|BACHE_ET_PROTECTION|PROTECTION_PROVISOIRE|R01-012-008\",\n      color: \"Not available\",\n    }\n  },\n  {\n    keywords: [\"hose\"],\n    category: {\n      path: \"Plumbing / Water supply circuit / Water supply flexible pipe\",\n      code: \"201123|FLEXIBLE_D_ALIMENTATION|CIRCUIT_D_ALIMENTATION_EN_EAU|R14-001\",\n      color: \"Not available\",\n    }\n  }\n];\n\nfor (const rule of rules) {\n  const match = rule.keywords.some(word => name.includes(word.toLowerCase()));\n  if (match) {\n    return [\n      { category: rule.category }\n    ];\n  }\n}\n\nreturn [\n  { category: {} }\n];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        672,
+        0
+      ],
+      "id": "e19c3fe8-cd3c-4ce8-8c72-71534a82ed88",
+      "name": "Get Category From Prepared List"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "30181e24-ffc2-420b-ac93-5db5a3c3ccb3",
+              "leftValue": "={{ $json.category }}",
+              "rightValue": "",
+              "operator": {
+                "type": "object",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        848,
+        0
+      ],
+      "id": "58cc00c6-3070-4b49-b5c7-df00e4093747",
+      "name": "If Have Category"
+    },
+    {
+      "parameters": {
+        "model": "deepseek/deepseek-chat",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenRouter",
+      "typeVersion": 1,
+      "position": [
+        560,
+        688
+      ],
+      "id": "349d5379-c784-4992-a9a1-dde621a3c59e",
+      "name": "OpenRouter Chat Model",
+      "credentials": {
+        "openRouterApi": {
+          "id": "",
+          "name": "YOUR_OPENROUTERAPI_CREDENTIAL"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "model": "deepseek/deepseek-chat",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenRouter",
+      "typeVersion": 1,
+      "position": [
+        736,
+        816
+      ],
+      "id": "d2174989-3a16-44b9-8c86-7a9a0c614c4d",
+      "name": "OpenRouter Chat Model1",
+      "credentials": {
+        "openRouterApi": {
+          "id": "",
+          "name": "YOUR_OPENROUTERAPI_CREDENTIAL"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "take only names color": {
+      "main": [
+        [
+          {
+            "node": "categ, dev_type, color",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "categ, dev_type, color": {
+      "main": [
+        [
+          {
+            "node": "output 1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set Params Adeo": {
+      "main": [
+        [
+          {
+            "node": "Api Odoo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get categories Adeo": {
+      "main": [
+        [
+          {
+            "node": "Patch Categories",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Patch Categories": {
+      "main": [
+        [
+          {
+            "node": "Filter Categories",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Color List": {
+      "main": [
+        [
+          {
+            "node": "take only names color",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Input": {
+      "main": [
+        [
+          {
+            "node": "Set Params Adeo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Api Odoo": {
+      "main": [
+        [
+          {
+            "node": "get items odoo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "get items odoo": {
+      "main": [
+        [
+          {
+            "node": "Get Category From Prepared List",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "output 1": {
+      "main": [
+        [
+          {
+            "node": "Cat Ref data1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Structured Output Parser1": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "categ, dev_type, color",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "get categories name": {
+      "main": [
+        [
+          {
+            "node": "full categories route",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "full categories route": {
+      "main": [
+        [
+          {
+            "node": "Get categories Adeo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter Categories": {
+      "main": [
+        [
+          {
+            "node": "Get Color List",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Category From Prepared List": {
+      "main": [
+        [
+          {
+            "node": "If Have Category",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If Have Category": {
+      "main": [
+        [
+          {
+            "node": "Cat Ref data1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "get categories name",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenRouter Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "categ, dev_type, color",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenRouter Chat Model1": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Structured Output Parser1",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": false
+  }
+}

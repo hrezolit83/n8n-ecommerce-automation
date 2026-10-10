@@ -1,0 +1,781 @@
+{
+  "name": "Monitoring: lost / missing marketplace orders across all channels + Bitrix24 alerts",
+  "nodes": [
+    {
+      "parameters": {
+        "jsCode": "const websiteId = $('Start').first().json.website_id;\n\nlet responsible = $('Get Marketplaces').all().map(item => item.json)?.find(f => +f.id === +websiteId)?.x_responsible_person_id.split(\"|\")[0] ?? \"\";\n\nconst developerId = responsible.length >=1 ? +responsible : null;\n\nreturn {developerId};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1040,
+        176
+      ],
+      "id": "a81974a1-d62b-48e5-95b2-13dbffd61d4c",
+      "name": "Get Developer Id"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "9c6c6aac-3d32-46b9-a139-c9ed96fb03d8",
+              "name": "date_now",
+              "value": "={{ $now.toUTC().format('yyyy-MM-dd HH:mm:ss') }}",
+              "type": "string"
+            },
+            {
+              "id": "c108daf7-d136-47de-a064-7ffa5ef2c791",
+              "name": "date_minus_four_hours",
+              "value": "={{ $now.toUTC().minus({ hours: 4 }).format('yyyy-MM-dd HH:mm:ss') }}",
+              "type": "string"
+            },
+            {
+              "id": "7897dabd-5b21-4f77-8415-3a550f2a80d3",
+              "name": "execution_id",
+              "value": "={{ $execution.id }}",
+              "type": "string"
+            },
+            {
+              "id": "a3d823ec-a7c9-4edd-b580-bb37480984ab",
+              "name": "workflow",
+              "value": "={{ $workflow }}",
+              "type": "object"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -240,
+        176
+      ],
+      "id": "deef9f38-9693-44d9-8d52-7c90ca625e0d",
+      "name": "Set Params"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('Bitrix credentials').first().json.baseURL }}/tasks.task.add",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n    \"fields\": {\n        \"TITLE\": \"Критически низкая маржинальность по заказу {{ $('Start').first().json.order_name }}\",\n        \"DESCRIPTION\": \"{{ $('Create jsonRPC Fields').first().json.description }}\",\n        \"DEADLINE\": \"{{ $('Deadline').first().json.deadline }}\",\n        \"RESPONSIBLE_ID\": \"183\",\n        \"ACCOMPLICES\": [{{ $('Get Developer Id').first().json.developerId !== null ? $('Get Developer Id').first().json.developerId + ', 59' : '59' }}],\n        \"PRIORITY\": \"2\",\n        \"STATUS\": \"2\",\n        \"GROUP_ID\": \"41\",\n        \"CREATED_BY\": \"183\",\n        \"TASK_CONTROL\": \"Y\",\n        \"UF_AUTO_491981288864\": \"{{ $('Error id').first().json.error_id }}\",\n        \"TAGS\": [\n            \"Регулярная\"\n        ]\n    }\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2064,
+        288
+      ],
+      "id": "70c4b829-d1ba-4d80-acf2-812374e6bb9f",
+      "name": "Adding task with error",
+      "retryOnFail": true,
+      "maxTries": 5,
+      "waitBetweenTries": 5000
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "f8044324-b9e9-466c-bfa2-7b1680e24896",
+              "name": "error_id",
+              "value": "={{ $now.toUTC().format('MM-yyyy') }}|{{ $('Start').first().json.website_id }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1216,
+        176
+      ],
+      "id": "b408ee6e-e8d2-4309-8b89-dc23c8e9edd9",
+      "name": "Error id"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "528bfca3-4223-45e2-9d58-3cbb2885bc3e",
+              "leftValue": "={{ $('Task id').first().json.task_id }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "exists",
+                "singleValue": true
+              }
+            },
+            {
+              "id": "5d59a90e-587c-4a8f-94ce-9201d7b72a3d",
+              "leftValue": "={{ $('Create jsonRPC Fields').first().json.new_task }}",
+              "rightValue": false,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1680,
+        176
+      ],
+      "id": "27ab3774-a92e-4dbe-8f00-252a43189d46",
+      "name": "If task exists",
+      "alwaysOutputData": false
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "18881bcb-db69-43d4-a631-82b23fec6b68",
+              "name": "task_id",
+              "value": "={{ $('Active task with the same error id').first().json.result.tasks[0].id || null}}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1536,
+        176
+      ],
+      "id": "b971ff64-8c5e-4d84-8ad8-a9ebb5884496",
+      "name": "Task id"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('Bitrix credentials').first().json.baseURL }}/tasks.task.list",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"filter\": {\n    \"UF_AUTO_491981288864\": \"{{ $('Error id').first().json.error_id }}\",\n    \"REAL_STATUS\": [1, 2, 3]\n  },\n  \"select\": [\"ID\", \"TITLE\"]\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1376,
+        176
+      ],
+      "id": "1627fbf8-c614-4362-ad14-e671a05674e8",
+      "name": "Active task with the same error id",
+      "retryOnFail": true,
+      "maxTries": 5,
+      "waitBetweenTries": 5000
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('Bitrix credentials').first().json.baseURL }}/task.commentitem.add",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"TASKID\": {{ $('Task id').first().json.task_id }},    \n  \"FIELDS\": {\n    \"POST_MESSAGE\": \"[B][SIZE=3]Найден еще один минусовый ордер:[/SIZE][/B] \\\\n\\\\n  Ссылка на ордер: https://your-instance.example.com/odoo/orders/{{ $('Start').first().json.order_id }} \\\\n\\\\n Минусовая маржа: {{ $('Start').first().json.margin }}\"\n  }\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1984,
+        64
+      ],
+      "id": "45e0b2cd-d737-4124-951d-cf6353f5b4f8",
+      "name": "Adding comment to task",
+      "retryOnFail": true,
+      "maxTries": 5,
+      "waitBetweenTries": 5000
+    },
+    {
+      "parameters": {
+        "jsCode": "let  date = $now.plus({ hours: 3 })\n\n// Проверка дня недели (1 = понедельник, 7 = воскресенье)\nlet day = date.weekday;\nlet hour = date.hour;\n\n// Если выходные → переносим на понедельник 12:00\nif (day === 6) { // суббота\n  date = date.plus({ days: 2 }).set({ hour: 12, minute: 0, second: 0 });\n} else if (day === 7) { // воскресенье\n  date = date.plus({ days: 1 }).set({ hour: 12, minute: 0, second: 0 });\n} else {\n  // Если нерабочее время (до 9 или после 19) → следующий рабочий день в 12:00\n  if (hour < 9 || hour >= 19) {\n    date = date.plus({ days: 1 }).set({ hour: 12, minute: 0, second: 0 });\n    \n    // Если следующий день оказался выходным — переносим на понедельник\n    let nextDay = date.weekday;\n    if (nextDay === 6) { // суббота\n      date = date.plus({ days: 2 });\n    } else if (nextDay === 7) { // воскресенье\n      date = date.plus({ days: 1 });\n    }\n  }\n}\n  \nreturn  { deadline: date.toFormat('yyyy-MM-dd HH:mm:ss') } "
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1888,
+        288
+      ],
+      "id": "5d5698ec-7877-48c4-be2c-6c96ce250bf0",
+      "name": "Deadline"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "0ff16c0f-49da-4e79-a601-af693e1ee7fb",
+              "name": "=baseURL",
+              "value": "=https://your-instance.example.com/rest/<USER_ID>/<WEBHOOK_KEY>",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        0,
+        176
+      ],
+      "id": "0fa20a8a-0574-40e2-9478-604696cc58da",
+      "name": "Bitrix credentials"
+    },
+    {
+      "parameters": {
+        "inputSource": "passthrough"
+      },
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        -448,
+        176
+      ],
+      "id": "5d934d02-b90c-4be2-9143-f770b8e9ac3e",
+      "name": "Start"
+    },
+    {
+      "parameters": {
+        "dataToSave": {
+          "values": [
+            {
+              "key": "execution_id",
+              "value": "={{ $json.execution_id }}"
+            },
+            {
+              "key": "workflow_id",
+              "value": "={{ $json.workflow.id }}"
+            },
+            {
+              "key": "workflow_name",
+              "value": "={{ $json.workflow.name }}"
+            },
+            {
+              "key": "order_id",
+              "value": "={{ $('Start').first().json.order_id }}"
+            },
+            {
+              "key": "order_name",
+              "value": "={{ $('Start').first().json.order_name }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.executionData",
+      "typeVersion": 1.1,
+      "position": [
+        0,
+        0
+      ],
+      "id": "8f855ac8-c6e7-487a-8655-39a371455713",
+      "name": "Execution Data"
+    },
+    {
+      "parameters": {
+        "resource": "custom",
+        "customResource": "website",
+        "operation": "getAll",
+        "returnAll": true,
+        "options": {
+          "fieldsList": [
+            "name",
+            "x_responsible_person_id"
+          ]
+        },
+        "filterRequest": {
+          "filter": [
+            {
+              "fieldName": "x_studio_website_type",
+              "value": "Marketplace"
+            },
+            {
+              "fieldName": "x_studio_available_for_price_sync",
+              "value": "={{ true }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.odoo",
+      "typeVersion": 1,
+      "position": [
+        208,
+        176
+      ],
+      "id": "4e099c74-3d3f-45af-ba49-8c487bbf8a21",
+      "name": "Get Marketplaces",
+      "credentials": {
+        "odooApi": {
+          "id": "",
+          "name": "YOUR_ODOOAPI_CREDENTIAL"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const list_of_mp = $('List of MP').first().json.list_of_mp;  \nconst current_website_id = $('Start').first().json.website_id;\nconst margin = $('Start').first().json.margin;\nconst website = $('Start').first().json.website_name;\nconst order_id = $('Start').first().json.order_id;\nconst comment = $('Start').first().json.comment;\n\nif (list_of_mp.includes(current_website_id)) {\n  return {\n    new_task: true,\n    order_status: false,\n    description: `[B][SIZE=3]Найден минусовый ордер.[/SIZE][/B] \\\\n\\\\n Ссылка на ордер: https://your-instance.example.com/odoo/orders/${order_id} \\\\n\\\\n Маркетплейс: ${website}, websiteId: ${current_website_id}\\\\n order_id: ${order_id},\\\\n  Минусовая маржа: ${margin},\\\\n\\\\n [B][SIZE=3]Задача для ответственного по синхронизации с площадкой (выполнить все или часть пунктов в зависимости от ситуации): [/SIZE][/B] \\\\n\\\\n 1. Проверить что каждая цена каждого товара из заказа соответствует цене с площадки.\\\\n 2. Проверить что цена на площадке равна цене из необходимого прайслиста (к примеру что французский листинг равен цене с франц прайс листа / или из бэкапного прайслиста).\\\\n 3. Проверить что доставка указана верно (если на этой площадке обновляются профили доставки).\\\\n 4. Проверить, что ваш процесс верно отрабатывает синхрон по ценам.\\\\n 5. (ситуативно) Сменить цену на мп сейчас, если не актуальна и профиль доставки по необходимости (если обновляемо). \\\\n 6. (ситуативно) Если при актуальной цене мы все равно имеем отрицательную маржу, то необходимо пересчитать цену этого артикула через recalculate price (за помощью обратится к Влад Кобец и/или Влад Коробка).\\\\n 7. После чего выставить актуальную цену. \\\\n\\\\n [B][SIZE=3]Задача для ответственного по маркетингу: [/SIZE][/B] \\\\n\\\\n Принять решение об отмене/отправке заказа на основании состояния маркетплейса (хелси и прочее) и прочих нюансов под конкретный МП.`\n      };\n}\n\nif (margin >= -20) {\n  return {\n        order_status: true\n      };\n} else {\n  return {\n    new_task: false,\n    order_status: false,\n    description: `Ссылка на ордер: https://your-instance.example.com/odoo/orders/${order_id} \\\\n\\\\n Маркетплейс: ${website}, websiteId: ${current_website_id}\\\\n\\\\n` + comment\n      };\n}\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        592,
+        176
+      ],
+      "id": "4a1ded6b-c376-4963-b9a8-ce3975253f7f",
+      "name": "Create jsonRPC Fields"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "6db0aee0-4f3b-46f3-8064-4ca9d97dc819",
+              "name": "list_of_mp",
+              "value": "={{ $input.all().flatMap(i => i.json.id) }}",
+              "type": "array"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        384,
+        176
+      ],
+      "id": "b9a4fa96-13d8-48d2-b3f4-6fa8ee2f130d",
+      "name": "List of MP",
+      "executeOnce": true
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "239db594-343d-4262-a571-d6a9647460a0",
+              "name": "order_status",
+              "value": "={{ false }}",
+              "type": "boolean"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        3024,
+        176
+      ],
+      "id": "ed01d480-6c2d-4f5e-b64d-eb77e697f5d7",
+      "name": "Set False Status"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "239db594-343d-4262-a571-d6a9647460a0",
+              "name": "order_status",
+              "value": "={{ true }}",
+              "type": "boolean"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1040,
+        0
+      ],
+      "id": "3d968925-73b7-4593-9265-fe37c90fbb4d",
+      "name": "Set True Status"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "1ff81b4a-cf9c-4be8-99b6-a9b3a4334ab6",
+              "leftValue": "={{ $json.order_status }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        800,
+        176
+      ],
+      "id": "57743248-59ee-43c3-850e-a2ce9cd01764",
+      "name": "Check Status"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('Api Settings Odoo prod').first().json.odoo_url }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json; charset=utf-8",
+        "body": "={\n  \"jsonrpc\": \"2.0\",\n  \"method\": \"call\",\n  \"params\": {\n    \"service\": \"object\",\n    \"method\": \"execute_kw\",\n    \"args\": [\n      \"{{ $json.odoo_name_sql }}\",\n      {{ $json.odoo_id_user_api }},\n      \"{{ $json.odoo_api }}\",\n      \"website\",\n      \"search_read\",\n      [\n          [\n              [\"x_studio_available_for_price_sync\", \"=\", \"true\"],\n              [\"id\", \"not in\", [87,89,200,201,202,121,192,191,94,187,91,198,199,190,93,188,92,120,96,95,98,97,112,39,170,174,42,173,40,171,35,167,41,172,37,168,38,169,175,47,50,48,44,49,45,46]]\n          ]\n      ],\n      {\n          \"fields\": [\n            \"id\", \n            \"name\"\n          ]\n      }\n    ]\n  }\n}\n",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2512,
+        176
+      ],
+      "id": "83c0a998-9607-4c34-a995-f84172f9e88a",
+      "name": "Available Websites"
+    },
+    {
+      "parameters": {
+        "jsCode": "let websites = $('Available Websites').first().json.result;\n\nlet products_to_update = $('Start').first().json.products;\n\nlet result = websites.flatMap(website => \n    products_to_update.map(product => ({\n        x_name: product.id.toString() + \" | \" + website.name + \" | \" + product.default_code,\n        x_studio_product: product.id, \n        x_studio_website: website.id\n    }))\n);\n\nreturn {\n  all_websites_products: result\n}\n\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2688,
+        176
+      ],
+      "id": "fcb40fe9-fc11-4f15-80b2-40dd3f3f2d4c",
+      "name": "Prepare Data"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('Api Settings Odoo prod').first().json.odoo_url }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n    \"jsonrpc\": \"2.0\",\n    \"method\": \"call\",\n    \"params\": {\n        \"service\": \"object\",\n        \"method\": \"execute_kw\",\n        \"args\": [\n            \"{{ $('Api Settings Odoo prod').item.json.odoo_name_sql }}\",\n            2,\n            \"{{ $('Api Settings Odoo prod').item.json.odoo_api }}\",\n            \"x_price_sync\",\n            \"create\",\n            [\n                {{ JSON.stringify($json.all_websites_products.map(item => ({\n  x_name: item.x_name,\n  x_studio_product: item.x_studio_product,\n  x_studio_website: item.x_studio_website\n}))) }}\n            ]\n        ]\n    }\n}\n ",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2848,
+        176
+      ],
+      "id": "5afbf1e3-9ceb-42da-a74f-641e830fa63c",
+      "name": "Create price Tasks"
+    },
+    {
+      "parameters": {
+        "mode": "raw",
+        "jsonOutput": "={\n  \"odoo_api\": \"<REDACTED>\",\n  \"odoo_id_user_api\": 2,\n  \"odoo_url\": \"https://your-instance.example.com/jsonrpc\",\n  \"odoo_name_sql\": \"your_odoo_db\"\n}\n",
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        2336,
+        176
+      ],
+      "id": "26c44f67-d045-4515-bbdb-32901509fc3a",
+      "name": "Api Settings Odoo prod",
+      "executeOnce": true
+    }
+  ],
+  "connections": {
+    "Get Developer Id": {
+      "main": [
+        [
+          {
+            "node": "Error id",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set Params": {
+      "main": [
+        [
+          {
+            "node": "Bitrix credentials",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Execution Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Adding task with error": {
+      "main": [
+        [
+          {
+            "node": "Api Settings Odoo prod",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Error id": {
+      "main": [
+        [
+          {
+            "node": "Active task with the same error id",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If task exists": {
+      "main": [
+        [
+          {
+            "node": "Adding comment to task",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Deadline",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Task id": {
+      "main": [
+        [
+          {
+            "node": "If task exists",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Active task with the same error id": {
+      "main": [
+        [
+          {
+            "node": "Task id",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Adding comment to task": {
+      "main": [
+        [
+          {
+            "node": "Api Settings Odoo prod",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Deadline": {
+      "main": [
+        [
+          {
+            "node": "Adding task with error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Bitrix credentials": {
+      "main": [
+        [
+          {
+            "node": "Get Marketplaces",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Start": {
+      "main": [
+        [
+          {
+            "node": "Set Params",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Marketplaces": {
+      "main": [
+        [
+          {
+            "node": "List of MP",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "List of MP": {
+      "main": [
+        [
+          {
+            "node": "Create jsonRPC Fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create jsonRPC Fields": {
+      "main": [
+        [
+          {
+            "node": "Check Status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Status": {
+      "main": [
+        [
+          {
+            "node": "Set True Status",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Get Developer Id",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Available Websites": {
+      "main": [
+        [
+          {
+            "node": "Prepare Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Data": {
+      "main": [
+        [
+          {
+            "node": "Create price Tasks",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Api Settings Odoo prod": {
+      "main": [
+        [
+          {
+            "node": "Available Websites",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create price Tasks": {
+      "main": [
+        [
+          {
+            "node": "Set False Status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set True Status": {
+      "main": [
+        []
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": false
+  }
+}

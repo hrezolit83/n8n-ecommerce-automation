@@ -1,0 +1,927 @@
+{
+  "name": "Auto-Reconciliation: Bank Payments <-> Odoo Invoices + Bitrix24 checklist",
+  "nodes": [
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('Api Odoo').first().json.odoProdUrl }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json; charset=utf-8",
+        "body": "={\n  \"jsonrpc\": \"2.0\",\n  \"method\": \"call\",\n  \"params\": {\n    \"service\": \"object\",\n    \"method\": \"execute_kw\",\n    \"args\": [\n      \"{{ $('Api Odoo').first().json.odoo_name_sql }}\",\n      \"{{ $('Api Odoo').first().json.odoo_id_user_api }}\",\n      \"{{ $('Api Odoo').first().json.odoo_api }}\",\n      \"account.bank.statement.line\",\n      \"search_read\",\n      [\n        [\n          [\"journal_id\", \"in\", [33]],\n          [\"is_reconciled\", \"=\", false],\n          [\"transaction_details\", \"like\", \"BILLH\"]\n        ]\n      ],\n      {\n        \"fields\": [\"id\", \"name\", \"date\", \"amount\", \"journal_id\", \"partner_id\", \"partner_name\", \"transaction_details\"],\n        \"limit\": 120\n      }\n    ]\n  },\n  \"id\": 1\n}\n",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -368,
+        16
+      ],
+      "id": "b9512f06-bb84-4bd9-a630-8572cd62001f",
+      "name": "non-attached transaction journal data",
+      "retryOnFail": true,
+      "waitBetweenTries": 3000,
+      "executeOnce": true
+    },
+    {
+      "parameters": {
+        "mode": "raw",
+        "jsonOutput": "{\n  \"odoo_name_sql\": \"your_odoo_db\",\n  \"odoo_id_user_api\": 2,\n  \"odoo_api\": \"<REDACTED>\",\n  \"odoProdUrl\": \"https://your-instance.example.com/jsonrpc\",\n  \"odoStageUrl\": \"https://your-instance.example.com/jsonrpc\"\n}\n",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -720,
+        16
+      ],
+      "id": "d3e04527-d528-4ad2-b80f-5b41e038dd20",
+      "name": "Api Odoo"
+    },
+    {
+      "parameters": {
+        "jsCode": "const invoices = $('Get Not Paid Invoices').first().json.result;\nconst payments = $('Parse Data').all().map(i => i.json);\n\nconst normalizeVendor = v =>\n  (v || '')\n    .toString()\n    .toUpperCase()\n    .replace(/\\bPE\\b/g, '')\n    .replace(/\\s+/g, ' ')\n    .trim();\n\nconst normalizeInvoiceName = v =>\n  (v || '')\n    .toString()\n    .toUpperCase()\n    .replace(/\\s+/g, '');\n\nconst isSameAmount = (a, b) =>\n  Math.abs(Number(a) - Number(b)) <= 0.05;\n\nconst matched = [];\nconst unMatched = [];\nconst usedInvoiceIds = new Set();\n\npayments.forEach(payment => {\n  const paymentAmount = Math.abs(Number(payment.amount));\n  const reasons = [];\n\n  // 1️⃣ Пошук по номеру інвойсу\n  let invoice = invoices.find(inv =>\n    !usedInvoiceIds.has(inv.id) &&\n    normalizeInvoiceName(inv.name) === normalizeInvoiceName(payment.odoo_name)\n  );\n\n  // 2️⃣ Fallback: вендор + сума\n  if (!invoice) {\n    const paymentVendorNorm = normalizeVendor(payment.partner_name);\n\n    const candidates = invoices.filter(inv =>\n      !usedInvoiceIds.has(inv.id) &&\n      normalizeVendor(inv.partner_id?.[1]) === paymentVendorNorm &&\n      isSameAmount(inv.amount_residual, paymentAmount)\n    );\n\n    if (candidates.length === 1) {\n      invoice = candidates[0];\n    } else if (candidates.length > 1) {\n      reasons.push({\n        reason: 'MULTIPLE_INVOICES_FOUND_BY_VENDOR_AND_AMOUNT',\n        vendor: payment.partner_name,\n        paymentAmount,\n        invoiceIds: candidates.map(i => i.id)\n      });\n    } else {\n      reasons.push('INVOICE_NOT_FOUND_BY_NAME');\n    }\n  }\n\n  // 3️⃣ Перевірка суми (ОБОВʼЯЗКОВА)\n  if (invoice) {\n    if (!isSameAmount(invoice.amount_residual, paymentAmount)) {\n      reasons.push({\n        reason: 'AMOUNT_MISMATCH',\n        invoiceAmount: invoice.amount_residual,\n        paymentAmount\n      });\n    }\n  }\n\n  // 4️⃣ Результат\n  if (invoice && reasons.length === 0) {\n    usedInvoiceIds.add(invoice.id);\n    matched.push({ payment, invoice });\n  } else {\n    unMatched.push({ payment, reasons });\n  }\n});\n\nreturn [\n  {\n    json: {\n      matched,\n      unMatched\n    }\n  }\n];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        272,
+        16
+      ],
+      "id": "746f337f-8d2e-487a-9fc3-a70968189ba6",
+      "name": "Matching Items",
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('Api Odoo').first().json.odoProdUrl }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json; charset=utf-8",
+        "body": "={\n  \"jsonrpc\": \"2.0\",\n  \"method\": \"call\",\n  \"params\": {\n    \"service\": \"object\",\n    \"method\": \"execute_kw\",\n    \"args\": [\n      \"{{ $('Api Odoo').first().json.odoo_name_sql }}\",\n      \"{{ $('Api Odoo').first().json.odoo_id_user_api }}\",\n      \"{{ $('Api Odoo').first().json.odoo_api }}\",\n      \"account.bank.statement.line\",\n      \"api_reconcile_with_move\",\n      [\n        [{{ $json.payment.id }}],\n        {\n          \"move_id\": {{ $json.invoice.id }}\n        }\n      ]\n    ]\n  }\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1184,
+        -128
+      ],
+      "id": "0e02a5fe-57a8-404b-b186-e8b7f1cc442f",
+      "name": "Auto-reconciliation",
+      "retryOnFail": true,
+      "waitBetweenTries": 3000,
+      "executeOnce": true
+    },
+    {
+      "parameters": {
+        "amount": 1
+      },
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        1392,
+        -128
+      ],
+      "id": "9c38dbde-5b49-4a47-b2d9-3ea8ac4aa9a8",
+      "name": "Wait1"
+    },
+    {
+      "parameters": {
+        "jsCode": "const payments = $('non-attached transaction journal data').first().json.result;\n\nconst parsedPayments = payments.map(p => {\n  let transactionDetails = null;\n  let odoo_name = null;\n\n  if (p.transaction_details) {\n    transactionDetails = JSON.parse(p.transaction_details);\n\n    // Беремо description та інформацію з extra\n    const description = transactionDetails.description || '';\n    const extraInfo = transactionDetails.extra?.information || '';\n\n    // З’єднуємо обидва тексти та прибираємо всі пробіли і перенос рядка\n    const cleanText = (description + ' ' + extraInfo).replace(/\\s+/g, '');\n\n    // Шукаємо BILLH з форматом BILLH/РРРР/ММ/номер (номер може бути відсутнім або частковим)\n    const match = cleanText.match(/BILLH\\/\\d{4}\\/\\d{2}\\/?\\d*/i);\n\n    if (match) {\n      odoo_name = match[0].toUpperCase(); // Нормалізуємо великими літерами\n    }\n  }\n\n  return {\n    ...p,\n    transaction_details: transactionDetails,\n    odoo_name,\n  };\n});\n\nreturn parsedPayments;\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -160,
+        16
+      ],
+      "id": "77ccd774-25f2-476f-be8f-ec58215100ba",
+      "name": "Parse Data"
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "loose",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.matched }}",
+                    "rightValue": "={{ $json.matched }}",
+                    "operator": {
+                      "type": "array",
+                      "operation": "notEmpty",
+                      "singleValue": true
+                    },
+                    "id": "7708275f-7787-4a74-96aa-70468bf24b26"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "matched"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "loose",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "b7323955-110a-4b31-a1ee-e152c69d38e6",
+                    "leftValue": "={{ $json.unMatched }}",
+                    "rightValue": "",
+                    "operator": {
+                      "type": "array",
+                      "operation": "notEmpty",
+                      "singleValue": true
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "unMatched"
+            }
+          ]
+        },
+        "looseTypeValidation": true,
+        "options": {
+          "allMatchingOutputs": true
+        }
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.3,
+      "position": [
+        480,
+        16
+      ],
+      "id": "6d74d652-b0cc-4943-b781-d2a7d2ae1969",
+      "name": "Switch"
+    },
+    {
+      "parameters": {
+        "fieldToSplitOut": "matched",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [
+        736,
+        -240
+      ],
+      "id": "fd2e36bf-e931-434d-9b18-b63d42621921",
+      "name": "Split Matched"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        1184,
+        -352
+      ],
+      "id": "ecd06a4d-6596-4da3-993f-34dc1951afc2",
+      "name": "End Branch"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('Bitrix credentials').first().json.baseURL }}/tasks.task.add",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"fields\": {\n    \"TITLE\": \"Не вдалося прив'язати оплати до інвойсів\",\n    \"DESCRIPTION\": \"Перелік платежів, які не вдалося привʼязати до інвойсів:\\\\n\\\\n{{ $('Matching Items').first().json.unMatched.map(i => { const name = i.payment.name || 'Не знайдено'; const odoo_name = i.payment.odoo_name || 'Не знайдено'; const amount = Math.abs(Number(i.payment.amount)) + ' EUR'; let reason = 'Невідома причина'; const r = i.reasons?.[0]; if(r === 'INVOICE_NOT_FOUND_BY_NAME') { reason = 'Інвойс з таким номером не знайдено'; } else if(r?.reason === 'AMOUNT_MISMATCH') { reason = `Сума не відповідає інвойсу (invoice: ${r.invoiceAmount} EUR, payment: ${r.paymentAmount} EUR)`; } return `Odoo name: ${odoo_name}\\\\nPayment name: ${name}\\\\nAmount: ${amount}\\\\nReason: ${reason}`; }).join('\\\\n\\\\n') }}\",\n     \"CHECKLIST\": [\n  {\"TITLE\": \"Odoo name: BILLH/2025/12/034, Payment name: BNK3/2025/08039, Amount: 2545.87 EUR, Reason: INVOICE_NOT_FOUND_BY_NAME\", \"IS_COMPLETE\": \"N\"},\n  {\"TITLE\": \"Odoo name: BILLH/2025/12/03, Payment name: BNK3/2025/08038, Amount: 1827.2 EUR, Reason: INVOICE_NOT_FOUND_BY_NAME\", \"IS_COMPLETE\": \"N\"},\n  {\"TITLE\": \"Odoo name: BILLH/2025/12, Payment name: BNK3/2025/08036, Amount: 7438.31 EUR, Reason: INVOICE_NOT_FOUND_BY_NAME\", \"IS_COMPLETE\": \"N\"}\n],\n    \"DEADLINE\": \"{{ $('Deadline').first().json.deadline }}\",\n    \"RESPONSIBLE_ID\": \"360\",\n    \"ACCOMPLICES\": [\"674\", \"584\"],\n    \"PRIORITY\": \"2\",\n    \"STATUS\": \"2\",\n    \"GROUP_ID\": \"33\",\n    \"CREATED_BY\": \"107\",\n    \"TASK_CONTROL\": \"Y\",\n    \"UF_AUTO_491981288864\": \"{{ $('Error id').first().json.error_id }}\"\n  }\n}\n",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1840,
+        80
+      ],
+      "id": "0520a84e-bca4-42d1-8c7f-03c31875ec1e",
+      "name": "Adding task with error",
+      "retryOnFail": true,
+      "maxTries": 5,
+      "waitBetweenTries": 5000
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "f8044324-b9e9-466c-bfa2-7b1680e24896",
+              "name": "error_id",
+              "value": "={{ Date.now() }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        928,
+        272
+      ],
+      "id": "fa310333-5d98-4b58-8ffe-3cae9ea87661",
+      "name": "Error id"
+    },
+    {
+      "parameters": {
+        "jsCode": "let  date = $now.plus({ hours: 24 })\n\n// Проверка дня недели (1 = понедельник, 7 = воскресенье)\nlet day = date.weekday;\nlet hour = date.hour;\n\n// Если выходные → переносим на понедельник 12:00\nif (day === 6) { // суббота\n  date = date.plus({ days: 2 }).set({ hour: 12, minute: 0, second: 0 });\n} else if (day === 7) { // воскресенье\n  date = date.plus({ days: 1 }).set({ hour: 12, minute: 0, second: 0 });\n} else {\n  // Если нерабочее время (до 9 или после 19) → следующий рабочий день в 12:00\n  if (hour < 9 || hour >= 19) {\n    date = date.plus({ days: 1 }).set({ hour: 12, minute: 0, second: 0 });\n    \n    // Если следующий день оказался выходным — переносим на понедельник\n    let nextDay = date.weekday;\n    if (nextDay === 6) { // суббота\n      date = date.plus({ days: 2 });\n    } else if (nextDay === 7) { // воскресенье\n      date = date.plus({ days: 1 });\n    }\n  }\n}\n  \nreturn  { deadline: date.toFormat('yyyy-MM-dd HH:mm:ss') } "
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1632,
+        80
+      ],
+      "id": "20b58602-dcc8-4215-bfb7-9863db7ecaf3",
+      "name": "Deadline"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "0ff16c0f-49da-4e79-a601-af693e1ee7fb",
+              "name": "=baseURL",
+              "value": "=https://your-instance.example.com/rest/<USER_ID>/<WEBHOOK_KEY>",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        736,
+        272
+      ],
+      "id": "854396a6-10da-404b-8902-22aca6263074",
+      "name": "Bitrix credentials"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        944,
+        -240
+      ],
+      "id": "94c34e9b-7e90-4210-89d0-05be6994329c",
+      "name": "Loop Matched"
+    },
+    {
+      "parameters": {
+        "mode": "raw",
+        "jsonOutput": "{\n  \"odoo_name_sql\": \"acme\",\n  \"odooProdSql\": \"your_odoo_db\",\n  \"odoo_id_user_api\": 2,\n  \"odoo_api\": \"<REDACTED>\",\n  \"odoProdUrl\": \"https://your-instance.example.com/jsonrpc\",\n  \"odoo_url\": \"https://your-instance.example.com/jsonrpc\"\n}\n",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -560,
+        16
+      ],
+      "id": "d0175d93-e619-45ce-9096-a881226a8a9e",
+      "name": "api odoo fresh"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('Api Odoo').first().json.odoProdUrl }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"jsonrpc\": \"2.0\",\n  \"method\": \"call\",\n  \"params\": {\n    \"service\": \"object\",\n    \"method\": \"execute_kw\",\n    \"args\": [\n      \"{{ $('Api Odoo').first().json.odoo_name_sql }}\",\n      \"{{ $('Api Odoo').first().json.odoo_id_user_api }}\",\n      \"{{ $('Api Odoo').first().json.odoo_api }}\",\n      \"account.move\",\n      \"search_read\",\n      [\n        [\n          [\"name\", \"in\", {{ \n  JSON.stringify(\n    $('Parse Data')\n      .all()\n      .map(i => i.json.odoo_name)\n      .filter(n => typeof n === 'string' && n.trim() !== '')\n  ) \n}}]\n        ]\n      ],\n\n      {\n        \"fields\": [\"id\", \"partner_id\", \"name\", \"payment_state\", \"state\", \"amount_total\", \"amount_residual\"],\n        \"limit\": 0\n      }\n    ]\n  }\n}\n",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        64,
+        16
+      ],
+      "id": "9ac6d008-485b-471c-8d7f-e89a736ee23b",
+      "name": "Get Not Paid Invoices",
+      "executeOnce": true
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "528bfca3-4223-45e2-9d58-3cbb2885bc3e",
+              "leftValue": "={{ Boolean($('Task id').first().json.task_id) }}",
+              "rightValue": "={{ null }}",
+              "operator": {
+                "type": "boolean",
+                "operation": "false",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1424,
+        272
+      ],
+      "id": "7621f4b5-9347-4a7f-ae7d-6f0c4a6611db",
+      "name": "If task exists",
+      "alwaysOutputData": false
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "18881bcb-db69-43d4-a631-82b23fec6b68",
+              "name": "task_id",
+              "value": "={{ $('Active task with the same error id').first().json.result.tasks[0].id || null}}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1264,
+        272
+      ],
+      "id": "ec410849-087a-4184-a67c-cd24d17619dd",
+      "name": "Task id"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('Bitrix credentials').first().json.baseURL }}/tasks.task.list",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{\n  \"filter\": {\n    \"TITLE\": \"Не вдалося прив'язати оплати до інвойсів\",\n    \"REAL_STATUS\": [1, 2, 3]\n  },\n  \"select\": [\"ID\", \"TITLE\"]\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1104,
+        272
+      ],
+      "id": "1f7e3478-1eb5-4f73-9d6f-ec3cea49064a",
+      "name": "Active task with the same error id",
+      "retryOnFail": true,
+      "maxTries": 5,
+      "waitBetweenTries": 5000
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "triggerAtHour": 9
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        -928,
+        16
+      ],
+      "id": "014a8a0f-3394-4290-876d-dbab7d6e2b7c",
+      "name": "Schedule Trigger"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('Bitrix credentials').first().json.baseURL }}/task.checklistitem.add ",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2224,
+        80
+      ],
+      "id": "0729d5d8-e1f9-4d99-8d3f-91f8d6b64f6d",
+      "name": "Adding CheckList",
+      "retryOnFail": true,
+      "maxTries": 5,
+      "waitBetweenTries": 5000
+    },
+    {
+      "parameters": {
+        "jsCode": "const taskId = $input.first().json.result.task.id; // ID створеної задачі\nconst items = $('Matching Items').first().json.unMatched;\n\nreturn items.map((i) => {\n    const paymentName = i.payment?.name || 'Не знайдено';\n    const odooName = i.payment?.odoo_name || 'Не знайдено';\n    const amount = Math.abs(Number(i.payment?.amount || 0)).toFixed(2);\n\n    let reason = 'Невідома причина';\n    const r = i.reasons?.[0];\n\n    if (r === 'INVOICE_NOT_FOUND_BY_NAME' || r?.reason === 'INVOICE_NOT_FOUND_BY_NAME') {\n        reason = 'Інвойс з таким номером не знайдено';\n    }\n\n    if (r?.reason === 'AMOUNT_MISMATCH') {\n        reason = `Сума не відповідає інвойсу (invoice: ${r.invoiceAmount} EUR, payment: ${r.paymentAmount} EUR)`;\n    }\n\n    return {\n        json: {\n            TASKID: taskId,\n            FIELDS: {\n                TITLE: `Odoo name: ${odooName}, Payment name: ${paymentName}, Amount: ${amount} EUR, Reason: ${reason}`\n            }\n        }\n    };\n});\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2032,
+        80
+      ],
+      "id": "77033fef-22f4-4255-be77-3f32433f9aa4",
+      "name": "Prepare Checklist"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('Bitrix credentials').first().json.baseURL }}/task.checklistitem.getlist",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\"TASKID\": {{ $json.task_id }},\"ORDER\":{\"IS_COMPLETE\":\"ASC\"}}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1648,
+        464
+      ],
+      "id": "e8826827-65dc-49fd-9c49-32ae765be1b0",
+      "name": "Get Checklist",
+      "retryOnFail": true,
+      "maxTries": 5,
+      "waitBetweenTries": 5000
+    },
+    {
+      "parameters": {
+        "jsCode": "const taskId = $('Task id').first().json.task_id;  \nconst items = $('Matching Items').first().json.unMatched;\nconst checkList = $('Get Checklist').first().json.result || []; // існуючий чеклист\n\n// функція для спрощеного порівняння TITLE\nfunction normalizeTitle(title) {\n    return title.replace(/\\s+/g, ' ').trim().toLowerCase();\n}\n\n// створюємо Set існуючих назв чеклістів\nconst existingTitles = new Set(checkList.map(c => normalizeTitle(c.TITLE)));\n\nconst newItems = items\n    .map((i) => {\n        const paymentName = i.payment?.name || 'Не знайдено';\n        const odooName = i.payment?.odoo_name || 'Не знайдено';\n        const amount = Math.abs(Number(i.payment?.amount || 0)).toFixed(2);\n\n        let reason = 'Невідома причина';\n        const r = i.reasons?.[0];\n\n        if (r === 'INVOICE_NOT_FOUND_BY_NAME' || r?.reason === 'INVOICE_NOT_FOUND_BY_NAME') {\n            reason = 'Інвойс з таким номером не знайдено';\n        } else if (r?.reason === 'AMOUNT_MISMATCH') {\n            reason = `Сума не відповідає інвойсу (invoice: ${r.invoiceAmount} EUR, payment: ${r.paymentAmount} EUR)`;\n        }\n\n        const title = `Odoo name: ${odooName}, Payment name: ${paymentName}, Amount: ${amount} EUR, Reason: ${reason}`;\n\n        // повертаємо null, якщо такий title вже існує\n        return existingTitles.has(normalizeTitle(title)) ? null : {\n            json: {\n                TASKID: taskId,\n                FIELDS: { TITLE: title }\n            }\n        };\n    })\n    .filter(Boolean); // видаляємо null\n\n// якщо нових айтемів немає\nif (newItems.length === 0) {\n    return [{ json: { allAlreadyInChecklist: true } }];\n}\n\nreturn newItems;\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1840,
+        464
+      ],
+      "id": "74efda24-6306-4710-a85f-d480ac4cdfd9",
+      "name": "Add New Items to Checklist"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        2288,
+        640
+      ],
+      "id": "5ce152cd-041e-4263-9cd2-b9f7ee8da8c9",
+      "name": "Do nothing"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "18422a96-8fe9-4a3e-92e9-27d0ebdd9992",
+              "leftValue": "={{ $json.allAlreadyInChecklist }}",
+              "rightValue": false,
+              "operator": {
+                "type": "boolean",
+                "operation": "false",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        2032,
+        464
+      ],
+      "id": "582d6082-3a99-43fb-9c5c-26aba1dd4b3f",
+      "name": "If New Items"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('Bitrix credentials').first().json.baseURL }}/task.checklistitem.add ",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2272,
+        320
+      ],
+      "id": "46c29671-7fa1-42d5-a7d0-1a4113d6950e",
+      "name": "Adding CheckList1",
+      "retryOnFail": true,
+      "maxTries": 5,
+      "waitBetweenTries": 5000
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('Api Odoo').first().json.odoProdUrl }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json; charset=utf-8",
+        "body": "={\n  \"jsonrpc\": \"2.0\",\n  \"method\": \"call\",\n  \"params\": {\n    \"service\": \"object\",\n    \"method\": \"execute_kw\",\n    \"args\": [\n      \"{{ $('Api Odoo').first().json.odoo_name_sql }}\",\n      \"{{ $('Api Odoo').first().json.odoo_id_user_api }}\",\n      \"{{ $('Api Odoo').first().json.odoo_api }}\",\n      \"account.move\",\n      \"action_post\",\n      [\n        {{ \n          JSON.stringify(\n            $('Filter Drafts')\n              .all()\n              .map(i => i.json.id)\n              .filter(id => typeof id === 'number')\n          )\n        }}\n      ]\n    ]\n  }\n}\n",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        464,
+        -240
+      ],
+      "id": "dcf4a452-28c2-423f-9828-978810051963",
+      "name": "Change Invoices Status",
+      "executeOnce": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const allInvoices = $('Get Not Paid Invoices').first().json.result;\nconst drafts = allInvoices.filter(i => i.state === \"draft\");\n\nreturn drafts;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        272,
+        -240
+      ],
+      "id": "479a1c88-fe6a-43ea-9b8a-dac01d332a22",
+      "name": "Filter Drafts"
+    }
+  ],
+  "connections": {
+    "Api Odoo": {
+      "main": [
+        [
+          {
+            "node": "api odoo fresh",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "non-attached transaction journal data": {
+      "main": [
+        [
+          {
+            "node": "Parse Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Matching Items": {
+      "main": [
+        [
+          {
+            "node": "Switch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Auto-reconciliation": {
+      "main": [
+        [
+          {
+            "node": "Wait1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait1": {
+      "main": [
+        [
+          {
+            "node": "Loop Matched",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Data": {
+      "main": [
+        [
+          {
+            "node": "Get Not Paid Invoices",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Switch": {
+      "main": [
+        [
+          {
+            "node": "Split Matched",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Bitrix credentials",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Matched": {
+      "main": [
+        [
+          {
+            "node": "Loop Matched",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Deadline": {
+      "main": [
+        [
+          {
+            "node": "Adding task with error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Error id": {
+      "main": [
+        [
+          {
+            "node": "Active task with the same error id",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Bitrix credentials": {
+      "main": [
+        [
+          {
+            "node": "Error id",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Matched": {
+      "main": [
+        [
+          {
+            "node": "End Branch",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Auto-reconciliation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Adding task with error": {
+      "main": [
+        [
+          {
+            "node": "Prepare Checklist",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "api odoo fresh": {
+      "main": [
+        [
+          {
+            "node": "non-attached transaction journal data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Not Paid Invoices": {
+      "main": [
+        [
+          {
+            "node": "Matching Items",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Filter Drafts",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Task id": {
+      "main": [
+        [
+          {
+            "node": "If task exists",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Active task with the same error id": {
+      "main": [
+        [
+          {
+            "node": "Task id",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If task exists": {
+      "main": [
+        [
+          {
+            "node": "Deadline",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Get Checklist",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "Api Odoo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Checklist": {
+      "main": [
+        [
+          {
+            "node": "Adding CheckList",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Checklist": {
+      "main": [
+        [
+          {
+            "node": "Add New Items to Checklist",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Add New Items to Checklist": {
+      "main": [
+        [
+          {
+            "node": "If New Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If New Items": {
+      "main": [
+        [
+          {
+            "node": "Adding CheckList1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Do nothing",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter Drafts": {
+      "main": [
+        []
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": false
+  }
+}

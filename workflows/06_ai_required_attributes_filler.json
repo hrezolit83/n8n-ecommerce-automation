@@ -1,0 +1,608 @@
+{
+  "name": "AI Required Attributes: fill marketplace value-lists with LLM",
+  "nodes": [
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=start",
+        "hasOutputParser": true,
+        "options": {
+          "systemMessage": "=# Role\nYOU are an agent who helps map the product attributes from the company to the required attributes on the marketplace and determines the values to be specified for these attributes.\n\n# Task\n1. Study the structure of marketplace attributes.\n2. Study the structure of company attributes.\n3. Study the product descriptions, as they may contain additional properties that are not included in the \"product properties\".\n4. Map the marketplace attributes to the company attributes, and fill them in according to the marketplace structure rules.\n\n\n# Company attributes\n{{ $json.result[0].x_studio_attributes }}\n\n# Marketplace attributes\n{{ JSON.stringify($('search need REQUIRED atributes').first().json.values_for_ai, null, 2) }}\n\n#List of required values\n{{ (() => {\n  try {\n    const list = $('Aggregate').first().json.values_lists;\n    return JSON.stringify(list ?? [], null, 2);\n  } catch (e) {\n    return JSON.stringify([], null, 2);\n  }\n})() }}\n\n\n\n\n# Product Descriptions\n{{ $json.result[0].website_description }}\n\n\n\n# Additional Information\n- Marketplace attributes include two importance levels:\n  - **REQUIRED**: MUST be filled. Try your best to infer value from description, company attributes or reasonable product knowledge.\n  - **RECOMMENDED**: SHOULD be filled whenever value can be reliably inferred from description, company attributes or name. If value is not clearly derivable — return empty string \"\" for that attribute (do NOT invent).\n- Use the **already selected product category**, which is guaranteed to be a leaf (final) category.\n- Do not use or copy the category from the marketplace attribute definition (it may not be a leaf).\n- Always apply feature values to the given product category only.\n\n# Important — values_lists handling (CRITICAL)\n- If an attribute has a non-null type_parameter and it appears in the \"List of required values\", the value MUST be the EXACT `label` string from one of the entries in that list (French label preferred — Adeo is a French marketplace).\n- Do NOT paraphrase. Do NOT translate. Do NOT invent new values. Do NOT return the `code` (LOV_xxx) — always return the `label`.\n- If none of the listed labels fits the product — return empty string \"\" (better empty than wrong value: Mirakl will reject unknown values).\n- Example: for `feature_10837_main_color` (Main Color) allowed labels include \"Beige\", \"Noir\", \"Blanc\", \"Gris\", \"Bleu\"... Pick one that matches the product color; if product is, say, \"anthracite\" and the list has \"Gris\" — you may pick \"Gris\"; if nothing reasonable matches — return \"\".\n- For attributes without type_parameter (free text): infer value in French from description/properties, keep it short (<100 chars).\n\n# Output Data\nReturn the data as a SINGLE JSON object with this exact structure:\n\n{\n  \"attributes\": [\n    { \"code\": \"...\", \"value\": \"...\", \"type_parameter\": \"...\" },\n    { \"code\": \"...\", \"value\": \"...\", \"type_parameter\": \"...\" }\n  ]\n}\n\nSTRICT RULES:\n- The response MUST start with `{` and end with `}` (a single object).\n- The response MUST NOT start with `[` (never a top-level array).\n- The response MUST NOT be wrapped in markdown fences (no ```json or ```).\n- The \"attributes\" array contains one entry per marketplace attribute, with fields: code, value, type_parameter.\n- Return ONLY the raw JSON object — no comments, no explanations, no extra text.\n"
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 2,
+      "position": [
+        1984,
+        0
+      ],
+      "id": "7e2bec45-fb42-42f7-b7b9-4aa669725cf8",
+      "name": "Selection properties",
+      "notes": "https://openai.com/api/pricing/\n\n# Categories on Another Website\nOn the company’s website, this product is listed under the categories provided below. Use this information as a hint.\n<Categories_on_another_website>\n{{ JSON.stringify($('Norm Product Data').item.json.cat_from_website) }}\n</Categories_on_another_website>\n\n# Output Data\nReturn the data in the following JSON structure.\n{{ $json.js }}\n\n{{ $('Get cat properties').item.json.items.toJsonString() }}"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "aa853fe3-b688-4435-8cd9-29f50320a8d5",
+              "name": "output",
+              "value": "={{JSON.parse($json.output.replace(/```json\\n|\\n```/g, ''))}}",
+              "type": "object"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        2272,
+        0
+      ],
+      "id": "52ba5702-f038-419c-81e9-c896473799c1",
+      "name": "properties"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "e511d48b-c6fd-4592-bc48-18bd58fdd439",
+              "leftValue": "={{ $json.values_for_ai }}",
+              "rightValue": "",
+              "operator": {
+                "type": "array",
+                "operation": "empty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        848,
+        0
+      ],
+      "id": "f3ab3743-0afb-4e3c-958e-fa3be89286d3",
+      "name": "have all REQUIRED atributes?"
+    },
+    {
+      "parameters": {
+        "jsCode": "let product_data = $('Start').first().json.product;\n\n// Беремо і REQUIRED, і RECOMMENDED (IMPORTANT в Adeo-звіті = RECOMMENDED в API)\nconst allowedLevels = [\"REQUIRED\", \"RECOMMENDED\"];\n\nlet mandatory_values = $input.first().json.attributes\n  .filter(item => allowedLevels.includes(item.requirement_level))\n  .map(item => ({\n    code: item.code,\n    name: item.label,\n    description: item.description,\n    requirement_level: item.requirement_level,\n    value: product_data[item.code] || \"\",\n    type_parameter: item.type_parameter\n  }));\n\nreturn {\n  mandatory_values: mandatory_values,\n  values_for_ai: mandatory_values.filter(item => item.value === \"\")\n};\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        640,
+        0
+      ],
+      "id": "bc750b2c-6ac2-4f78-b781-f55c8af4d4aa",
+      "name": "search need REQUIRED atributes"
+    },
+    {
+      "parameters": {
+        "url": "={{ $('Api Adeo').first().json.baseUrl }}/api/products/attributes",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "shop_id",
+              "value": "={{ $('Api Adeo').first().json.shop_ids }}"
+            },
+            {
+              "name": "hierarchy",
+              "value": "={{ $('Start').last().json.addValues.code }}"
+            }
+          ]
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "={{ $('Api Adeo').first().json.apiKey }}"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        464,
+        0
+      ],
+      "id": "cf25ed4d-d873-48b8-bfac-bdfc52a4f430",
+      "name": "atributes",
+      "retryOnFail": true,
+      "waitBetweenTries": 4000,
+      "alwaysOutputData": true,
+      "executeOnce": false,
+      "notesInFlow": false
+    },
+    {
+      "parameters": {
+        "inputSource": "passthrough"
+      },
+      "id": "60d37754-0433-4e35-b3ae-f21e72d3cea2",
+      "typeVersion": 1.1,
+      "name": "Start",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "raw",
+        "jsonOutput": "{ \n  \"store\": \"adeo\", \n  \"baseUrl\": \"https://adeo-marketplace.mirakl.net\", \n  \"shop_ids\": 6026, \n  \"apiKey\": \"<REDACTED>\" \n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        304,
+        0
+      ],
+      "id": "5f051469-0718-4c47-a8c6-9eff450d62ab",
+      "name": "Api Adeo",
+      "executeOnce": true
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('Api Odoo').first().json.odoProdUrl }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n    \"jsonrpc\": \"2.0\",\n    \"method\": \"call\",\n    \"params\": {\n        \"service\": \"object\",\n        \"method\": \"execute_kw\",\n        \"args\": [\n            \"{{ $('Api Odoo').first().json.odoo_name_sql }}\",\n            \"{{ $('Api Odoo').first().json.odoo_id_user_api }}\",\n            \"{{ $('Api Odoo').first().json.odoo_api }}\",\n            \"product.template\",\n            \"search_read\",\n            [\n                [\n                    [\"id\", \"=\", {{ $('Start').last().json.addValues.productId }}]\n                ]\n            ],\n            {\n                \"fields\": [\n                  \"name\",\n                  \"x_studio_name_3\",\n                  \"website_meta_title\",\n                  \"website_description\",\n                  \"feed_color\",\n                  \"x_studio_attributes\"\n                ],\n                \"context\": {\n                    \"lang\": \"en_US\"\n                }\n            }\n        ]\n    }\n}\n ",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1808,
+        0
+      ],
+      "id": "ba5ad183-61f1-4e30-8b72-58efefe54854",
+      "name": "get items odoo",
+      "retryOnFail": true,
+      "waitBetweenTries": 4000
+    },
+    {
+      "parameters": {
+        "mode": "raw",
+        "jsonOutput": "{\n  \"odoo_name_sql\": \"your_odoo_db\",\n  \"odoo_id_user_api\": 2,\n  \"odoo_api\": \"<REDACTED>\",\n  \"odoProdUrl\": \"https://your-instance.example.com/jsonrpc\",\n  \"odoStageUrl\": \"https://your-instance.example.com/jsonrpc\"\n}\n",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        160,
+        0
+      ],
+      "id": "6d594159-b628-4530-89f4-ef011cc315df",
+      "name": "Api Odoo",
+      "executeOnce": true
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// --- Нормалізація output: підтримуємо масив, об'єкт-обгортку {attributes:[]}, об'єкт або JSON-рядок ---\nlet raw = $json.output;\n\nif (typeof raw === 'string') {\n  // Знімаємо markdown-обгортку ```json ... ```\n  raw = raw.replace(/^```(?:json)?\\s*/i, '').replace(/\\s*```$/, '').trim();\n  try {\n    raw = JSON.parse(raw);\n  } catch (e) {\n    throw new Error(`Не вдалось розпарсити output як JSON: ${e.message}`);\n  }\n}\n\n// Приводимо до масиву атрибутів\nlet data;\nif (Array.isArray(raw)) {\n  // вже масив атрибутів\n  data = raw;\n} else if (raw && Array.isArray(raw.attributes)) {\n  // об'єкт-обгортка { attributes: [...] }\n  data = raw.attributes;\n} else if (raw && typeof raw === 'object' && raw.code) {\n  // один атрибут об'єктом\n  data = [raw];\n} else {\n  data = [];\n}\n\n// --- Мапа requirement_level з попереднього кроку ---\nconst origMap = {};\n($('search need REQUIRED atributes').first().json.values_for_ai || []).forEach(i => {\n  origMap[i.code] = i.requirement_level;\n});\n\nconst atributesFromAI = [];\nconst error = [];\n\ndata.forEach(i => {\n  const item = {\n    code: i.code,\n    value: i.value,\n    type_parameter: i.type_parameter\n  };\n  \n  // Помилкою вважаємо лише порожнє REQUIRED. Для RECOMMENDED порожнє значення — OK.\n  if (!i.value && origMap[i.code] === \"REQUIRED\") {\n    error.push(item);\n  }\n  \n  // У продукт пишемо тільки непорожні значення\n  if (i.value) atributesFromAI.push(item);\n});\n\nreturn { atributesFromAI, error };"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2464,
+        0
+      ],
+      "id": "30670b78-1bc5-4d89-bc52-2c267d1b4ed2",
+      "name": "Format and Check Data"
+    },
+    {
+      "parameters": {
+        "jsCode": "const values_for_ai = $input.first().json.values_for_ai || [];\n\n// Перевірено в Adeo:\n//   type_parameter = \"ATT_10837\"           -> /api/values_lists?code=ATT_10837            OK\n//   type_parameter = \"MOD_201057_ATT_22088\"-> /api/values_lists?code=MOD_201057_ATT_22088 OK\n//   type_parameter = \"1024\"                -> 404 (це код типу \"Image URL\", не values_list)\n//   type_parameter = \"3\"                   -> загальний текстовий тип, пропускаємо\n//\n// Логіка фільтру: лишаємо атрибути, які МОЖУТЬ мати values_list.\n// Це ATT_* і MOD_*_ATT_* (завжди есть список). Все інше (числові коди типу 1024,\n// \"3\", null, порожнє) — відкидаємо. Додатково виключаємо media_* (картинки/відео).\n\nconst filtered = values_for_ai.filter(item => {\n  const tp = item.type_parameter;\n  if (tp === null || tp === undefined || tp === \"\") return false;\n  if (tp === \"3\") return false;\n\n  const code = String(item.code || \"\");\n  if (code.startsWith(\"media_\")) return false;\n\n  const tpStr = String(tp);\n  // Пропускаємо тільки ті type_parameter, що мають values_list у Adeo.\n  if (tpStr.startsWith(\"ATT_\") || tpStr.startsWith(\"MOD_\")) return true;\n\n  // Числові (1024 тощо) — це не values_list id, відкидаємо.\n  return false;\n});\n\nreturn filtered;\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1056,
+        16
+      ],
+      "id": "18c842b3-8dd3-44c8-b6ee-d8af525bfa8e",
+      "name": "Filter type_parameter",
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        1440,
+        112
+      ],
+      "id": "a27f8588-e08c-4a1d-a580-37d5b4a7d0ca",
+      "name": "Loop Over Items"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        1664,
+        320
+      ],
+      "id": "2b018ded-5251-4e48-b759-d42f86be47f2",
+      "name": "Wait"
+    },
+    {
+      "parameters": {
+        "url": "={{ $('Api Adeo').first().json.baseUrl }}/api/values_lists",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "shop_id",
+              "value": "={{ $('Api Adeo').first().json.shop_ids }}"
+            },
+            {
+              "name": "code",
+              "value": "={{ $('Loop Over Items').first().json.type_parameter }}"
+            }
+          ]
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "={{ $('Api Adeo').first().json.apiKey }}"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1840,
+        320
+      ],
+      "id": "ec332ebd-5f5d-41cf-84f7-3fd71d3c0b15",
+      "name": "Get value_lists",
+      "retryOnFail": true,
+      "waitBetweenTries": 4000,
+      "alwaysOutputData": true,
+      "executeOnce": false,
+      "notesInFlow": false,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "aggregate": "aggregateAllItemData",
+        "destinationFieldName": "values_lists",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.aggregate",
+      "typeVersion": 1,
+      "position": [
+        1616,
+        96
+      ],
+      "id": "a1058339-667e-4e2e-8d6f-85ec4115845a",
+      "name": "Aggregate"
+    },
+    {
+      "parameters": {
+        "jsCode": "const input = $input.first().json;\n\nconst result = (input.values_lists || []).map(list => ({\n  code: list.code,\n  label: list.label,\n  values: (list.values || []).map(v => ({\n    value: v.label\n  }))\n}));\n\n// Тепер обертаємо результат у масив з ключем = code першого елемента values_lists\nconst wrapped = {\n  [input.values_lists[0].label]: result\n};\n\n// Повертаємо як масив з одним об'єктом для n8n\nreturn [{ json: wrapped }];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2048,
+        320
+      ],
+      "id": "c0b40793-81cc-4eab-b1bd-977e0d08d7b6",
+      "name": "Processing Data"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "6a67f92e-ffe5-4604-bfb2-e6139e8130dd",
+              "leftValue": "={{ $json }}",
+              "rightValue": "",
+              "operator": {
+                "type": "object",
+                "operation": "empty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1232,
+        16
+      ],
+      "id": "3b7be10f-1121-419e-919b-259aad6d0449",
+      "name": "If result empty"
+    },
+    {
+      "parameters": {
+        "model": "deepseek/deepseek-chat",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenRouter",
+      "typeVersion": 1,
+      "position": [
+        1984,
+        192
+      ],
+      "id": "194d5b37-0c19-4645-8f55-58e380ecc2f4",
+      "name": "OpenRouter Chat Model",
+      "credentials": {
+        "openRouterApi": {
+          "id": "",
+          "name": "YOUR_OPENROUTERAPI_CREDENTIAL"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Selection properties": {
+      "main": [
+        [
+          {
+            "node": "properties",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "properties": {
+      "main": [
+        [
+          {
+            "node": "Format and Check Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "search need REQUIRED atributes": {
+      "main": [
+        [
+          {
+            "node": "have all REQUIRED atributes?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "atributes": {
+      "main": [
+        [
+          {
+            "node": "search need REQUIRED atributes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "have all REQUIRED atributes?": {
+      "main": [
+        [],
+        [
+          {
+            "node": "Filter type_parameter",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Start": {
+      "main": [
+        [
+          {
+            "node": "Api Odoo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Api Adeo": {
+      "main": [
+        [
+          {
+            "node": "atributes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "get items odoo": {
+      "main": [
+        [
+          {
+            "node": "Selection properties",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Api Odoo": {
+      "main": [
+        [
+          {
+            "node": "Api Adeo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter type_parameter": {
+      "main": [
+        [
+          {
+            "node": "If result empty",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Over Items": {
+      "main": [
+        [
+          {
+            "node": "Aggregate",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Wait",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait": {
+      "main": [
+        [
+          {
+            "node": "Get value_lists",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get value_lists": {
+      "main": [
+        [
+          {
+            "node": "Processing Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Aggregate": {
+      "main": [
+        [
+          {
+            "node": "get items odoo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Processing Data": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If result empty": {
+      "main": [
+        [
+          {
+            "node": "get items odoo",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenRouter Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Selection properties",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": false
+  }
+}
