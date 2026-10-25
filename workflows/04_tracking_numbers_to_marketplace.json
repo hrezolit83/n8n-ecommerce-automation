@@ -1,0 +1,494 @@
+{
+  "name": "Tracking Numbers -> Marketplace: Odoo shipment data, website and carrier validation, order fulfillment via CDON API",
+  "nodes": [
+    {
+      "parameters": {
+        "method": "PUT",
+        "url": "={{ $json.baseURL }}/v1/orders/{{ $('Processing Move Data').first().json.orderNumberCdon }}/fulfill",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Basic {{ $json.encoded_to_base64 }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n\t\"tracking_information\": [\n\t\t{\n        \t\"carrier_name\": \"{{ $('Get Cdon CarrierName').item.json.carrierName }}\",\n    \t\t\"tracking_number\": \"{{ $('Processing Move Data').first().json.trackingNumber }}\"\n\t\t}\n\t]\n}\n",
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": true
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1824,
+        160
+      ],
+      "id": "cc600ae5-3cf0-4348-b3e9-9392c9d8f751",
+      "name": "Send Confirmation to CDON"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "80ca3240-dc38-47a7-8701-36d50bb83582",
+              "name": "baseURL",
+              "value": "https://merchants-api.cdon.com/api",
+              "type": "string"
+            },
+            {
+              "id": "796041ea-c573-4f44-8008-961a1615af11",
+              "name": "merch_id",
+              "value": "<REDACTED>",
+              "type": "string"
+            },
+            {
+              "id": "1a1a725b-5db9-42b4-9ee8-c016ee41a0d2",
+              "name": "token",
+              "value": "<REDACTED>",
+              "type": "string"
+            },
+            {
+              "id": "f4f2c276-5412-4561-99a0-dca423360297",
+              "name": "encoded_to_base64",
+              "value": "<REDACTED>",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1616,
+        160
+      ],
+      "id": "1538326f-ff73-47c0-b333-a9939f6c501c",
+      "name": "Set Params CDON"
+    },
+    {
+      "parameters": {
+        "mode": "raw",
+        "jsonOutput": "{\n  \"odoo_name_sql\": \"your_odoo_db\",\n  \"odoo_id_user_api\": 2,\n  \"odoo_api\": \"<REDACTED>\",\n  \"odoProdUrl\": \"https://your-instance.example.com/jsonrpc\"\n}\n",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        192,
+        160
+      ],
+      "id": "29910f79-5132-4ca3-b2b7-ac37eece6224",
+      "name": "Set params Odoo Prod"
+    },
+    {
+      "parameters": {
+        "content": "## Why the 60s wait\nThe webhook arrives with an empty tracking number and carrier. We wait so the label-creation workflow can fill them in Odoo first.",
+        "height": 344,
+        "width": 320,
+        "color": 3
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        0,
+        -48
+      ],
+      "id": "338986b2-042a-4389-b583-967dd0092d67",
+      "name": "Sticky Note"
+    },
+    {
+      "parameters": {
+        "amount": 60
+      },
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        16,
+        160
+      ],
+      "id": "16df6962-9c9d-4dcd-bd9a-e87af1898a21",
+      "name": "Wait1"
+    },
+    {
+      "parameters": {
+        "dataToSave": {
+          "values": [
+            {
+              "key": "orderId",
+              "value": "={{$json.body.sale_id}}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.executionData",
+      "typeVersion": 1,
+      "position": [
+        -176,
+        160
+      ],
+      "id": "a5f193f2-fbf4-4bc9-bf73-c07460bd6a43",
+      "name": "Execution Data1"
+    },
+    {
+      "parameters": {
+        "inputSource": "passthrough"
+      },
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        -384,
+        160
+      ],
+      "id": "fbe5c734-8e77-4525-9ecc-d59f8bf0efca",
+      "name": "Start"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "8a6e5892-c5b2-4a05-959c-bbb24a41faab",
+              "name": "trackingNumber",
+              "value": "={{ $json.result[0].carrier_tracking_ref }}",
+              "type": "string"
+            },
+            {
+              "id": "14dc7ba6-4548-454d-af40-b679d9fb10f4",
+              "name": "orderNumberCdon",
+              "value": "={{ $json.result[0].x_studio_referer_order_number }}",
+              "type": "string"
+            },
+            {
+              "id": "350cea39-278c-4565-ab56-9ec8c90fb6ac",
+              "name": "carrierName",
+              "value": "={{ $json.result[0].x_studio_delivery_provider_1 || $json.result[0].x_studio_delivery_provider_id[1] }}",
+              "type": "string"
+            },
+            {
+              "id": "e59aaf60-54db-4732-802a-b8d0b2f7cffa",
+              "name": "websiteId",
+              "value": "={{ $json.result[0].x_studio_order_website_id }}",
+              "type": "number"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        560,
+        160
+      ],
+      "id": "2d3263dc-defe-4b18-b1d3-b36d726973f5",
+      "name": "Processing Move Data"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "cbaf1cf9-e606-4adf-9d59-d21d2e3d12c6",
+              "leftValue": "={{ $json.isProvider }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1376,
+        160
+      ],
+      "id": "55c17abf-0130-4bf8-b2ed-e845e5d312ba",
+      "name": "Check Provider"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "e1663333-6600-4bbc-8db7-b7b2b389b398",
+              "leftValue": "={{ $json.isStoreCdon }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        928,
+        160
+      ],
+      "id": "3fc0203d-5097-4f2f-a210-903dd0fef90e",
+      "name": "Check Website"
+    },
+    {
+      "parameters": {
+        "jsCode": "const countryOfStore = [87, 88, 89];\n\nconst websiteId = $input.first().json.websiteId;\n\nconst isStoreCdon = countryOfStore.includes(websiteId);\n\nreturn {isStoreCdon, websiteId };\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        752,
+        160
+      ],
+      "id": "97d12887-723c-41ed-bb94-e199b9eb3701",
+      "name": "Website Code"
+    },
+    {
+      "parameters": {
+        "errorMessage": "Received Wrong Delivery (website id) From Router"
+      },
+      "type": "n8n-nodes-base.stopAndError",
+      "typeVersion": 1,
+      "position": [
+        928,
+        448
+      ],
+      "id": "19e5e710-7ac8-4912-b78f-bd7d5b6a9e9b",
+      "name": "Filter by Website"
+    },
+    {
+      "parameters": {
+        "errorMessage": "Received wrong delivery (carrier name) from router"
+      },
+      "type": "n8n-nodes-base.stopAndError",
+      "typeVersion": 1,
+      "position": [
+        1392,
+        448
+      ],
+      "id": "cf4c8cdc-f24c-4897-b47d-b1ad4330124d",
+      "name": "Filter by Provider"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $json.odoProdUrl }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n    \"jsonrpc\": \"2.0\",\n    \"method\": \"call\",\n    \"params\": {\n        \"service\": \"object\",\n        \"method\": \"execute_kw\",\n        \"args\": [\n            \"{{$json.odoo_name_sql}}\",\n            \"{{$json.odoo_id_user_api}}\",\n            \"{{ $json.odoo_api }}\",\n            \"stock.picking\",\n            \"read\",\n            [{{ $('Start').first().json.body.id }}],\n            {\n                \"fields\": [\n                  \"x_studio_delivery_provider_id\", \n                  \"x_studio_order_website_id\", \n                  \"x_studio_referer_order_number\", \n                  \"carrier_tracking_ref\",\n                  \"x_studio_delivery_provider_id\"\n                ]\n            }\n        ]\n    }\n}\n",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        384,
+        160
+      ],
+      "id": "b93cf18d-8df5-4dc6-b17e-a74882e044f3",
+      "name": "Get Move Data",
+      "retryOnFail": true,
+      "waitBetweenTries": 3000
+    },
+    {
+      "parameters": {
+        "jsCode": "const carrierNamesOfCdon = [\n  \"Airmee\",\n  \"Asendia\",\n  \"Budbee\",\n  \"Posten Bring\",\n  \"Bpost\",\n  \"Chronopost\",\n  \"Colissimo\",\n  \"CityMail\",\n  \"FedEx\",\n  \"DAO\",\n  \"DB Schenker\",\n  \"DHL\",\n  \"DPD\",\n  \"Early Bird\",\n  \"GLS\",\n  \"Helthjem\",\n  \"Instabox\",\n  \"Matkahuolto\",\n  \"Posti\",\n  \"PostNL\",\n  \"PostNord\",\n  \"YunExpress\",\n  \"UPS\"\n];\n\nconst carrier = $('Processing Move Data').first().json.carrierName?.toLowerCase() || '';\n\nconst carrierName = carrierNamesOfCdon.find(c =>\n  carrier.includes(c.toLowerCase())\n);\n\nconst isProvider = !!carrierName;\n\nreturn { isProvider, carrierName: carrierName || null };"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1168,
+        160
+      ],
+      "id": "ab2936f4-f4eb-4897-a5ad-48268e54d436",
+      "name": "Get Cdon CarrierName"
+    }
+  ],
+  "connections": {
+    "Set Params CDON": {
+      "main": [
+        [
+          {
+            "node": "Send Confirmation to CDON",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set params Odoo Prod": {
+      "main": [
+        [
+          {
+            "node": "Get Move Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait1": {
+      "main": [
+        [
+          {
+            "node": "Set params Odoo Prod",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Execution Data1": {
+      "main": [
+        [
+          {
+            "node": "Wait1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Start": {
+      "main": [
+        [
+          {
+            "node": "Execution Data1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Processing Move Data": {
+      "main": [
+        [
+          {
+            "node": "Website Code",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Website": {
+      "main": [
+        [
+          {
+            "node": "Get Cdon CarrierName",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Filter by Website",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Provider": {
+      "main": [
+        [
+          {
+            "node": "Set Params CDON",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Filter by Provider",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Website Code": {
+      "main": [
+        [
+          {
+            "node": "Check Website",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Move Data": {
+      "main": [
+        [
+          {
+            "node": "Processing Move Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Cdon CarrierName": {
+      "main": [
+        [
+          {
+            "node": "Check Provider",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": false
+  }
+}

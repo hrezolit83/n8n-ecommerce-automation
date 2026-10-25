@@ -9,7 +9,7 @@ All credentials, company names, hosts and IDs are removed. Workflows are importa
 | 01 | Marketplace Autoposting (main): Odoo → Marketplace | 76 | Orchestrator + sub-workflows, attribute matching, image pipeline, compliance filter, stage routing |
 | 02 | Marketplace Orders → Odoo Sales Orders | 35 | Customer deduplication, SKU matching, order total check, sale order via JSON-RPC |
 | 03 | Stock & Price Sync: Odoo → Mirakl | 31 | Batch loops, diff-only updates, multi-channel pricing, rate-limit waits |
-| 04 | Tracking Numbers Sync + Alerts | 42 | Shipment aggregation, carrier validation, Bitrix24 error tasks |
+| 04 | Tracking Numbers → Marketplace (order fulfillment) | 14 | Sub-workflow triggered by Odoo, delayed read of shipment data, website and carrier validation, fulfillment via REST API |
 | 05 | AI Category Mapper | 19 | LLM classification against a category tree, structured output parser |
 | 06 | AI Required Attributes Filler | 18 | LLM + marketplace value lists, strict prompt rules, fallbacks |
 | 07 | Auto-Reconciliation: Bank Payments ↔ Odoo Invoices | 29 | Odoo accounting API, matching logic, Bitrix24 checklist |
@@ -56,13 +56,18 @@ All credentials, company names, hosts and IDs are removed. Workflows are importa
 
 **Result.** Thousands of offers are updated in minutes, and only real changes hit the API.
 
-## Case 4 — Tracking numbers and error alerts
+## Case 4 — Tracking numbers to the marketplace
 
-**Problem.** Shipped orders had to get tracking numbers on the marketplace, otherwise the seller rating dropped.
+**Problem.** After shipping, every order had to be confirmed on the marketplace with the carrier and tracking number, otherwise the seller rating dropped.
 
-**Solution.** The workflow collects completed pickings in Odoo, matches them with marketplace orders, validates carrier tracking numbers (including return labels), sends shipping data and calls sub-workflows for dropshipping and freight. Any error creates or updates a task in Bitrix24 for the responsible developer, without duplicating tasks.
+**Solution.** When a delivery is validated in Odoo, a router calls this sub-workflow with the shipment ID. It:
+1. Waits briefly, because the label-creation process fills in the tracking number and carrier a moment later.
+2. Reads the shipment from Odoo (JSON-RPC): tracking number, carrier, marketplace order number and website.
+3. Checks that the shipment belongs to one of the marketplace's country stores (DK/SE/FI).
+4. Maps the Odoo carrier name to the marketplace's list of supported carriers.
+5. Sends the fulfillment with tracking information to the marketplace API, or stops with a clear error if the website or carrier is wrong.
 
-**Result.** Tracking is transferred automatically; problems reach a person within minutes as a task, not as a customer complaint.
+**Result.** Orders are confirmed with tracking automatically, a minute after shipping, without manual work.
 
 ## Cases 5–6 — AI enrichment of product data
 
