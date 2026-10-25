@@ -1,0 +1,2474 @@
+{
+  "name": "Multi-language Listing (DK/SE/FI): Odoo -> CDON marketplace with validation, chemicals/GPSR checks and stage routing",
+  "nodes": [
+    {
+      "parameters": {
+        "mode": "raw",
+        "jsonOutput": "{\n  \"odoo_name_sql\": \"your_odoo_db\",\n  \"odoo_id_user_api\": 2,\n  \"odoo_api\": \"<REDACTED>\",\n  \"odoProdUrl\": \"https://your-instance.example.com/jsonrpc\",\n  \"odoStageUrl\": \"https://your-instance.example.com/jsonrpc\"\n}\n",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -10176,
+        -272
+      ],
+      "id": "4ac5f1fd-803a-4163-95b8-b9da27147808",
+      "name": "Api Odoo"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        -9392,
+        -272
+      ],
+      "id": "4998d4e2-01ce-4d01-a3be-85f75b041286",
+      "name": "Loop Over Items"
+    },
+    {
+      "parameters": {
+        "fieldToSplitOut": "websitesData",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [
+        -9568,
+        -272
+      ],
+      "id": "477f0e4d-8ddc-4498-870e-3d154e63bef6",
+      "name": "Split Out"
+    },
+    {
+      "parameters": {
+        "inputSource": "passthrough"
+      },
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        -10352,
+        -272
+      ],
+      "id": "dc8a1886-86e0-4175-b986-fe42e5e2f0d6",
+      "name": "Start"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('Api Odoo').all()[0].json.odoProdUrl }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n    \"jsonrpc\": \"2.0\",\n    \"method\": \"call\",\n    \"params\": {\n        \"service\": \"object\",\n        \"method\": \"execute_kw\",\n        \"args\": [\n            \"{{ $('Api Odoo').first().json.odoo_name_sql }}\",\n            \"{{ $('Api Odoo').first().json.odoo_id_user_api }}\",\n            \"{{ $('Api Odoo').first().json.odoo_api }}\",\n            \"product.template\",\n            \"search_read\",\n            [\n                [\n                    [\"id\", \"=\", {{ $('Start').first().json.productId }}]\n                ]\n            ],\n            {\n                \"fields\": [\n                  \"categ_id\",\n                  \"public_categ_ids\",\n                  \"taxes_id\",\n                  \"is_published\",\n                  \"name\",\n                  \"x_studio_name_2\",\n                  \"x_studio_description_unique\",\n                  \"x_studio_name_3\",\n                  \"product_tag_ids\",\n                  \"website_meta_title\",\n                  \"barcode\",\n                  \"x_studio_cdon_id\",\n                  \"x_studio_one2many_field_239_1iuehljp9\",\n                  \"x_studio_manufacturer_name\",\n                  \"website_description\",\n                  \"feed_gmc_min_energy_efficiency_class\",\n                  \"energy_efficiency_class\",\n                  \"x_studio_eu_responsible_town\",\n                  \"x_studio_eu_responsible_country\",\n                  \"x_studio_eu_responsible_street\",\n                  \"x_studio_eu_responsible_house_no\",\n                  \"x_studio_eu_responsible_post_code\",\n                  \"x_studio_link_aws\",\n                  \"feed_gmc_age_group\",\n                  \"x_studio_eu_responsible_town\",\n                  \"x_studio_eu_responsible_country\",\n                  \"x_studio_eu_responsible_street\",\n                  \"x_studio_eu_responsible_house_no\",\n                  \"x_studio_eu_responsible_post_code\",\n                  \"x_studio_eu_responsible_name\",\n                  \"x_studio_eu_responsible_email\",\n                  \"x_studio_eu_responsible_phone_number\",\n                  \"x_studio_brand_name\",\n                  \"feed_length\",\n                  \"feed_height\",\n                  \"feed_width\",\n                  \"feed_shipping_weight\",\n                  \"feed_shipping_weight_uom\",\n                  \"feed_shipping_length\",\n                  \"feed_shipping_size_uom\",\n                  \"feed_shipping_width\",\n                  \"feed_shipping_height\",\n                  \"feed_gmc_min_energy_efficiency_class\",\n                  \"feed_color\",\n                  \"weight\",\n                  \"weight_uom_name\",\n                  \"country_of_origin\",\n                  \"feed_material\",\n                  \"weight\",\n                  \"volume\",\n                  \"volume_uom_name\",\n                  \"x_studio_plenty_id\",\n                  \"default_code\",\n                  \"list_price\",\n                  \"taxes_id\",\n                  \"x_studio_discount\",\n                  \"dr_free_qty\",\n                  \"bom_count\",\n                  \"bom_ids\",\n                  \"product_template_image_ids\",\n                  \"base_unit_id\",\n                  \"base_unit_count\",\n                  \"x_studio_basic_quantity\",\n                  \"seo_product_brand\",\n                  \"seo_product_color\",\n                  \"x_studio_attachments\",\n                  \"image_1920\"\n                ],\n                \"context\": {\n                    \"lang\": \"{{ $json.locale_code }}\"\n                }\n            }\n        ]\n    }\n}\n ",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -9232,
+        -128
+      ],
+      "id": "0c85dbb7-e743-4bae-934a-585891fd0ae6",
+      "name": "get items odoo",
+      "retryOnFail": true,
+      "waitBetweenTries": 4000
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all(); \nconst locales = $('CDON Basic Settings').first().json.websitesData.map(i => i.locale_code);\n\nconst grouped = {};\n\nlocales.forEach((locale, index) => {\n  grouped[locale] = items[index].json;\n});\n\nreturn [{ json: grouped }];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -8864,
+        -288
+      ],
+      "id": "b67780a5-b9bd-47eb-9e86-d8810e6d3f3a",
+      "name": "grouped by lang"
+    },
+    {
+      "parameters": {
+        "content": "# Set Params",
+        "height": 272,
+        "width": 720,
+        "color": 7
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -10384,
+        -368
+      ],
+      "typeVersion": 1,
+      "id": "c779a221-c249-4f8a-b2d3-c1a4f37e0b00",
+      "name": "Sticky Note13"
+    },
+    {
+      "parameters": {
+        "content": "# Get data for All Langs",
+        "height": 624,
+        "width": 1024,
+        "color": 6
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -9632,
+        -368
+      ],
+      "typeVersion": 1,
+      "id": "d6e2e628-cacf-42d2-a984-08db340e8e9d",
+      "name": "Sticky Note15"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "55d5be06-2946-4f8d-aed6-90475e518f3d",
+              "leftValue": "={{ $json.result }}",
+              "rightValue": "",
+              "operator": {
+                "type": "array",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -9072,
+        -128
+      ],
+      "id": "5c526aa1-fbc5-487a-8873-89a8fa848048",
+      "name": "Product Exist?"
+    },
+    {
+      "parameters": {
+        "jsCode": "const basicData = [\n  { \n    websiteId: 87, \n    locale_code: \"da_DK\",\n    market: \"DK\",\n    pricelist_id: 9,\n    currency_code: \"DKK\"\n  },\n  { \n    webSiteId: 88,\n    locale_code: \"sv_SE\",\n    market: \"SE\",\n    pricelist_id: 25,\n    currency_code: \"SEK\"\n  },\n  { \n    webSiteId: 89,\n    locale_code: \"fi_FI\",\n    market: \"FI\",\n    pricelist_id: 11,\n    currency_code: \"EUR\"\n  }\n]\n  \nlet websitesData = basicData.map(item => ({\n    ...item,\n    odoo_product_id: $('Start').first().json.productId,\n    odo_task_id: $('Start').first().json.taskId\n}));\n\nreturn { websitesData };\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -9824,
+        -272
+      ],
+      "id": "e16ada3e-1bee-43df-beb5-acdd259c9a81",
+      "name": "CDON Basic Settings"
+    },
+    {
+      "parameters": {
+        "mode": "raw",
+        "jsonOutput": "{ \n  \"store\": \"CDON\", \n  \"baseURL\": \"https://merchants-api.cdon.com/api\", \n  \"merchantID\": \"<REDACTED>\", \n  \"token\": \"<REDACTED>\",\n  \"base64_encoded\": \"<REDACTED>\"\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -10000,
+        -272
+      ],
+      "id": "b23755d7-5f58-4ff2-8366-6bf41e38b171",
+      "name": "Api CDON"
+    },
+    {
+      "parameters": {
+        "resource": "custom",
+        "customResource": "mail.message",
+        "fieldsToCreateOrUpdate": {
+          "fields": [
+            {
+              "fieldName": "model",
+              "fieldValue": "x_auto_posting"
+            },
+            {
+              "fieldName": "res_id",
+              "fieldValue": "={{ $('Loop Over Items2').first().json.taskId }}"
+            },
+            {
+              "fieldName": "message_type",
+              "fieldValue": "comment"
+            },
+            {
+              "fieldName": "subtype_id",
+              "fieldValue": "={{ 1 }}"
+            },
+            {
+              "fieldName": "body",
+              "fieldValue": "={{ $('status to forge error1').first().json.message }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.odoo",
+      "typeVersion": 1,
+      "position": [
+        -5920,
+        384
+      ],
+      "id": "5f875291-d0bc-4452-b559-1725b2460044",
+      "name": "send message",
+      "retryOnFail": true,
+      "credentials": {
+        "odooApi": {
+          "id": "",
+          "name": "YOUR_ODOOAPI_CREDENTIAL"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "content": "# Active",
+        "height": 320,
+        "width": 960,
+        "color": 4
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -6672,
+        224
+      ],
+      "typeVersion": 1,
+      "id": "b4edef04-a9d9-49a8-9c3d-8e099d9cccc3",
+      "name": "Sticky Note"
+    },
+    {
+      "parameters": {
+        "resource": "custom",
+        "customResource": "x_auto_posting",
+        "operation": "update",
+        "customResourceId": "={{ $('Loop Over Items2').first().json.taskId }}",
+        "fieldsToCreateOrUpdate": {
+          "fields": [
+            {
+              "fieldName": "x_studio_stage_id",
+              "fieldValue": "={{ 3 }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.odoo",
+      "typeVersion": 1,
+      "position": [
+        -6064,
+        384
+      ],
+      "id": "c4f4f122-dfb4-4892-ade2-e33516e8eeb9",
+      "name": "send active stage",
+      "retryOnFail": true,
+      "credentials": {
+        "odooApi": {
+          "id": "",
+          "name": "YOUR_ODOOAPI_CREDENTIAL"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "content": "# Error Category",
+        "height": 448,
+        "width": 896,
+        "color": 3
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -4000,
+        208
+      ],
+      "typeVersion": 1,
+      "id": "9075a5f9-3381-4d82-b4b9-c039b14a1d7c",
+      "name": "Sticky Note5"
+    },
+    {
+      "parameters": {
+        "resource": "custom",
+        "customResource": "mail.message",
+        "fieldsToCreateOrUpdate": {
+          "fields": [
+            {
+              "fieldName": "model",
+              "fieldValue": "x_auto_posting"
+            },
+            {
+              "fieldName": "res_id",
+              "fieldValue": "={{ $('Loop Over Items3').first().json.taskId }}"
+            },
+            {
+              "fieldName": "message_type",
+              "fieldValue": "comment"
+            },
+            {
+              "fieldName": "subtype_id",
+              "fieldValue": "={{ 1 }}"
+            },
+            {
+              "fieldName": "body",
+              "fieldValue": "={{ $('Unexpected Category').first().json.message }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.odoo",
+      "typeVersion": 1,
+      "position": [
+        -3264,
+        464
+      ],
+      "id": "906b7f73-50c7-493c-937a-31df057daff9",
+      "name": "send message problem1",
+      "retryOnFail": true,
+      "credentials": {
+        "odooApi": {
+          "id": "",
+          "name": "YOUR_ODOOAPI_CREDENTIAL"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "custom",
+        "customResource": "x_auto_posting",
+        "operation": "update",
+        "customResourceId": "={{ $('Loop Over Items3').first().json.taskId }}",
+        "fieldsToCreateOrUpdate": {
+          "fields": [
+            {
+              "fieldName": "x_studio_stage_id",
+              "fieldValue": "={{ 7 }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.odoo",
+      "typeVersion": 1,
+      "position": [
+        -3440,
+        464
+      ],
+      "id": "c0fcdcdb-5c3b-44be-8415-f60c4e6defc7",
+      "name": "send Unexpected Category stage",
+      "retryOnFail": true,
+      "credentials": {
+        "odooApi": {
+          "id": "",
+          "name": "YOUR_ODOOAPI_CREDENTIAL"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "custom",
+        "customResource": "mail.message",
+        "fieldsToCreateOrUpdate": {
+          "fields": [
+            {
+              "fieldName": "model",
+              "fieldValue": "x_auto_posting"
+            },
+            {
+              "fieldName": "res_id",
+              "fieldValue": "={{ $('Loop Over Items1').first().json.taskId }}"
+            },
+            {
+              "fieldName": "message_type",
+              "fieldValue": "comment"
+            },
+            {
+              "fieldName": "subtype_id",
+              "fieldValue": "={{ 1 }}"
+            },
+            {
+              "fieldName": "body",
+              "fieldValue": "={{ $('status to forge error').first().json.message }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.odoo",
+      "typeVersion": 1,
+      "position": [
+        -7552,
+        160
+      ],
+      "id": "ae683978-cdd3-481b-b056-a920c1acb750",
+      "name": "send message problem3",
+      "retryOnFail": true,
+      "credentials": {
+        "odooApi": {
+          "id": "",
+          "name": "YOUR_ODOOAPI_CREDENTIAL"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "custom",
+        "customResource": "x_auto_posting",
+        "operation": "update",
+        "customResourceId": "={{ $json.taskId }}",
+        "fieldsToCreateOrUpdate": {
+          "fields": [
+            {
+              "fieldName": "x_studio_stage_id",
+              "fieldValue": "={{ 4 }}"
+            },
+            {
+              "fieldName": "x_studio_error_reasons",
+              "fieldValue": "={{ $('status to forge error').first().json.reason }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.odoo",
+      "typeVersion": 1,
+      "position": [
+        -7712,
+        160
+      ],
+      "id": "1cbce3e5-ff4b-484b-9c14-caf9780b88a0",
+      "name": "send error stage",
+      "retryOnFail": true,
+      "credentials": {
+        "odooApi": {
+          "id": "",
+          "name": "YOUR_ODOOAPI_CREDENTIAL"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "custom",
+        "customResource": "product.pricelist.item",
+        "operation": "getAll",
+        "returnAll": true,
+        "options": {
+          "fieldsList": [
+            "pricelist_id",
+            "currency_id",
+            "fixed_price"
+          ]
+        },
+        "filterRequest": {
+          "filter": [
+            {
+              "fieldName": "pricelist_id",
+              "operator": "in",
+              "value": "={{ \n  $('CDON Basic Settings').first().json.websitesData\n    .map(i => i.pricelist_id)\n    .filter(id => id != null)\n}}"
+            },
+            {
+              "fieldName": "product_tmpl_id",
+              "value": "={{ $('Start').first().json.productId }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.odoo",
+      "typeVersion": 1,
+      "position": [
+        -5136,
+        -192
+      ],
+      "id": "ceb0d7cf-e98c-4c75-87e9-d4e0b5820805",
+      "name": "Get Price",
+      "alwaysOutputData": true,
+      "executeOnce": true,
+      "credentials": {
+        "odooApi": {
+          "id": "",
+          "name": "YOUR_ODOOAPI_CREDENTIAL"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "content": "# Is Listed Checking",
+        "height": 560,
+        "width": 720,
+        "color": 5
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -6688,
+        -384
+      ],
+      "typeVersion": 1,
+      "id": "661d1b82-b679-4511-9d37-f49b111aff1d",
+      "name": "Sticky Note4"
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.body.status }}",
+                    "rightValue": "deleted",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "id": "0979ec37-d8f0-4293-8e39-408968d733c5"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "deleted"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "e4c24075-547f-4510-bc71-8e68a057deb3",
+                    "leftValue": "={{ $json.body.status }}",
+                    "rightValue": "for sale",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "for sale"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "50b084cd-196d-45c9-9fec-46be6504237f",
+                    "leftValue": "={{ $json.body.status }}",
+                    "rightValue": "paused",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "paused"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "07d7741b-6e3e-408c-82f3-765a72ba1465",
+                    "leftValue": "={{ $json.error.status }}",
+                    "rightValue": 403,
+                    "operator": {
+                      "type": "number",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "ERR_BAD_REQUEST"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.3,
+      "position": [
+        -6384,
+        -256
+      ],
+      "id": "087075d2-0bf5-4d3b-bad4-25469a5dd1b9",
+      "name": "Switch"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "2df6b53b-0e94-498a-8ee1-e1de10feafe2",
+              "name": "message",
+              "value": "=Product is already listed and active, marketplace SKU: {{ $('GET Cdon Article').first().json.sku }}, cdonId: {{ $('GET Cdon Article').first().json.id }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -6304,
+        32
+      ],
+      "id": "0b012138-75a2-4248-bc22-70cafc615bf1",
+      "name": "Message Product Active"
+    },
+    {
+      "parameters": {
+        "jsCode": "const productInfo = $('Get Product Info').first().json;\nconst productLang = $('grouped by lang').first().json;\n\n// const izsInfo = $('Checks Level #2').first().json.infoIZS || \"\";\n// Safety documents are not sent yet: the marketplace has no field for them\nconst additional_images = $('Final URLs').first().json.additional_images;\nconst markets = $('Checks Level #1').first().json.markets;\nconst odooPrices = $('Get Price').all().map(i => i.json);\nconst websitesData = $('CDON Basic Settings').first().json.websitesData;\nconst currencyRates = $('Get Curency Rate').all().map(i => i.json);\nconst productTags = productInfo.product_tag_ids;\nconst taxes = productInfo.taxes_id;\n\nconst height = productInfo.feed_height;\nconst width  = productInfo.feed_width;\nconst depth  = productInfo.feed_length;\nconst size = String(Math.max(height, width, depth));\n\nconst countryMap = {\n  \"Germany\": \"DE\",\n  \"Sweden\": \"SE\",\n  \"Finland\": \"FI\",\n  \"Denmark\": \"DK\",\n  \"Spain\": \"ES\",\n  \"Netherlands\": \"NL\",\n  \"Belgium\": \"BE\",\n  \"Romania\": \"RO\",\n  \"France\": \"FR\",\n  \"Italy\": \"IT\",\n  \"Portugal\": \"PT\",\n  \"Poland\": \"PL\"\n};\n\nconst weight = String(productInfo.weight || \"\");\n\nconst material = $('Get Material').first().json.material || \"Not available\";\nconst color = $('Get Material').first().json.color || \"Not available\";\n\nlet sku = productInfo.default_code || \"\";\nif (sku.startsWith('SKU-')) {\n  sku = sku.replace(/^SKU-/, '');\n}\n\nconst images = [\n  ...additional_images,\n  productInfo.x_studio_link_aws,\n  // izsInfo \n  // Safety documents are not sent yet\n].filter(i => i && i.trim() !== \"\");\n\nconst standard_vat = {\n  SE: 0.25,\n  DK: 0.25,\n  FI: 0.255\n};\n\nconst reduced_vat = {\n  SE: 0.12,\n  DK: 0.25,\n  FI: 0.14\n};\n\nlet vat_type = \"\";\nif (taxes.includes(17) || taxes.includes(66)) {\n  vat_type = \"reduced\";\n} else {\n  vat_type = \"standard\";\n}\n\nconst rateDKK = currencyRates.find(r => r.name === 'DKK')?.rate;\nconst rateSEK = currencyRates.find(r => r.name === 'SEK')?.rate;\n\nconst smallDK = +(13.99 * rateDKK).toFixed(2);\nconst standardDK = +(13.99 * rateDKK).toFixed(2);\n\nconst smallSE = +(12.99 * rateSEK).toFixed(2);\nconst standardSE = +(18.99 * rateSEK).toFixed(2);\n\nconst shippingTable = {\n  DK: { small: smallDK, standard: standardDK },\n  FI: { small: 14.99, standard: 19.99 },\n  SE: { small: smallSE, standard: standardSE }\n};\n\nfunction getLogisticClass(product_tag_ids, market) {\n  if (!Array.isArray(product_tag_ids)) return 0;\n  const tags = product_tag_ids.map(t => Array.isArray(t) ? t[0] : t);\n\n  switch (true) {\n    case tags.includes(9):\n      return 0; // free shipping\n    case tags.includes(2):\n      return shippingTable[market]?.standard || 0;\n    case tags.includes(1):\n      return shippingTable[market]?.small || 0;\n    default:\n      return 2;\n  }\n}\n\nconst price = websitesData\n  .filter(m => markets.includes(m.market))\n  .map(m => {\n\n    const found = odooPrices.find(p =>\n      p.pricelist_id &&\n      typeof p.pricelist_id[1] === 'string' &&\n      p.pricelist_id[1].toLowerCase().includes(m.market.toLowerCase())\n    );\n\n    if (!found) return null;\n\n    const deliveryCost = getLogisticClass(productTags, m.market);\n    const finalPrice = Number(found.fixed_price) + Number(deliveryCost);\n\n    const vat =\n      vat_type === \"reduced\"\n        ? reduced_vat[m.market]\n        : standard_vat[m.market];\n\n    return {\n      market: m.market,\n      value: {\n        amount_including_vat: Number(finalPrice.toFixed(2)),\n        currency: found.currency_id[1],\n        vat_rate: vat\n      }\n    };\n  })\n  .filter(Boolean);\n\nconst localeMap = {\n  SE: \"sv_SE\",\n  DK: \"da_DK\",\n  FI: \"fi_FI\"\n};\n\nconst title = markets.map(market => ({\n  language: localeMap[market].replace('_', '-'),\n  value: productLang[localeMap[market]]?.x_studio_name_2 || \"\"\n}));\n\nconst description = markets.map(market => ({\n  language: localeMap[market].replace('_', '-'),\n  value: productLang[localeMap[market]]?.x_studio_description_unique || \"\"\n}));\n\nconst shipping_time = markets.map(market => ({\n  market,\n  min: 4,\n  max: 7\n}));\n\nconst delivery_type = markets.map(market => ({\n  market,\n  value: \"home_delivery\"\n}));\n\nlet phone = productInfo.x_studio_eu_responsible_phone_number;\nif (phone) {\n  phone = phone.trim().replace(/[^\\d+]/g, '');\n  phone = phone.replace(/^00/, '+');\n  if (!phone.startsWith('+')) phone = '+' + phone;\n}\n\nconst  quantity = Math.floor(productInfo.dr_free_qty) < 0 ? 0 : Math.floor(productInfo.dr_free_qty);\n\nlet status = \"for sale\";\nif (quantity === 0) {\n  status = \"paused\";\n}\n\nconst article = {\n  sku,\n  gtin: $('Checks Level #1').first().json.barcode,\n  brand: $('Checks Level #1').first().json.brand,\n  status,\n  category: \"\",\n  quantity,\n  main_image: $('Final URLs').first().json.main_img,\n  markets,\n  price,\n  images,\n  title,\n  description,\n  shipping_time,\n  classifications: [\n    { name: \"CONDITION\", value: \"NEW\" }\n  ],\n  delivery_type,\n  properties: [\n    { name: \"color\", value: color, language: \"en-US\" },\n    { name: \"material\", value: material, language: \"en-US\" },\n    { name: \"size_cm\", value: size },\n    { name: \"weight_kg\", value: weight }\n  ],\n  manufacturer: {\n    name: productInfo.x_studio_manufacturer_name,\n    address: {\n      street_address: productInfo.x_studio_eu_responsible_street,\n      city: productInfo.x_studio_eu_responsible_town,\n      postal_code: productInfo.x_studio_eu_responsible_post_code,\n      country: countryMap[productInfo.x_studio_eu_responsible_country] || null\n    },\n    website: \"https://ich-zapfe.de\",\n    email: \"user@example.com\",\n    responsible_person: {\n      name: productInfo.x_studio_eu_responsible_name,\n      phone,\n      email: productInfo.x_studio_eu_responsible_email\n    }\n  }\n};\n\nif (!images || images.length === 0) {\n  delete article.images;\n}\n\nreturn { article };\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -4256,
+        -192
+      ],
+      "id": "056f3416-7f91-4642-b571-ee579edef998",
+      "name": "Formating products"
+    },
+    {
+      "parameters": {
+        "content": "# Get Properties & Formating",
+        "height": 448,
+        "width": 1024,
+        "color": 6
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -5168,
+        -288
+      ],
+      "typeVersion": 1,
+      "id": "01b6c76e-0dda-494f-bc8c-1576f9b8e540",
+      "name": "Sticky Note3"
+    },
+    {
+      "parameters": {
+        "resource": "custom",
+        "customResource": "x_list_properties_of_p",
+        "operation": "getAll",
+        "returnAll": true,
+        "options": {
+          "fieldsList": [
+            "id",
+            "x_name",
+            "x_studio_group_name",
+            "x_studio_project_name",
+            "x_studio_properties_name",
+            "x_studio_value"
+          ]
+        },
+        "filterRequest": {
+          "filter": [
+            {
+              "fieldName": "id",
+              "operator": "in",
+              "value": "={{ $('Get Product Info').first().json.x_studio_one2many_field_239_1iuehljp9 }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.odoo",
+      "typeVersion": 1,
+      "position": [
+        -4992,
+        -192
+      ],
+      "id": "fcefbf5a-d96f-4fea-8f46-865d15c9f864",
+      "name": "get properties",
+      "alwaysOutputData": true,
+      "retryOnFail": true,
+      "credentials": {
+        "odooApi": {
+          "id": "",
+          "name": "YOUR_ODOOAPI_CREDENTIAL"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "let array_properties = $('get properties').all().flatMap(item => item.json);\nlet check_wee = array_properties[0].x_studio_properties_name ? (array_properties.find(f => f.x_studio_properties_name[0] === +136)?.x_studio_value.length > 2  ? true : false) : false;\n\nlet wee_allowed = true;\n\n// if(check_wee === true){\n//   if($('Basic settings for all ebay').first().json.account_id !== \"acme\"){\n//     wee_allowed = false;\n//   }\n// };\n\nreturn [{\n  array_properties: array_properties,\n  check_wee: check_wee,\n  wee_allowed: wee_allowed\n}]"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -4624,
+        -192
+      ],
+      "id": "09783a30-ebf6-4a2b-8896-3f6b92a50b8a",
+      "name": "properties to array and check weee"
+    },
+    {
+      "parameters": {
+        "jsCode": "const input = Array.isArray($json) ? $json : [$json];\n\nreturn input.map(item => {\n  const properties = item.array_properties || [];\n\n  const material = properties.find(\n    prop => prop.x_studio_properties_name?.[0] === 135\n  )?.x_studio_value || null;\n\n  const color = properties.find(\n    prop => prop.x_studio_properties_name?.[0] === 134\n  )?.x_studio_value || null;\n\n  return {  \n    material, \n    color      \n  };\n});\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -4432,
+        -192
+      ],
+      "id": "0443a642-e75d-4226-ab61-7e0b531116db",
+      "name": "Get Material"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "2db562a5-3787-45b7-9bed-178c5228a089",
+              "name": "message",
+              "value": "Product is archived or deleted in Odoo",
+              "type": "string"
+            },
+            {
+              "id": "247d4fdb-96e6-47a5-b450-b27ac846d806",
+              "name": "reason",
+              "value": "Manually Deactivated",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -8848,
+        80
+      ],
+      "id": "3bec2ed8-a444-4210-9a4d-8729ab527187",
+      "name": "No Product"
+    },
+    {
+      "parameters": {
+        "content": "# Categories Selection",
+        "height": 464,
+        "width": 1104,
+        "color": 6
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -4096,
+        -288
+      ],
+      "typeVersion": 1,
+      "id": "d698d735-27ec-410b-a3eb-cd8f9f29af7f",
+      "name": "Sticky Note8"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "fa974e33-c845-4277-8377-a92b4935fac2",
+              "leftValue": "={{ $json.isGood }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -3472,
+        -192
+      ],
+      "id": "addab61b-a8a4-411b-9adc-8dd942ef3a8e",
+      "name": "isGood?1"
+    },
+    {
+      "parameters": {
+        "jsCode": "const output = $input.first().json;\n\n// Check that the output is not empty\nif (!output || Object.keys(output).length === 0) {\n  return { isGood: false };\n}\n\nif (!output.id) {\n  return { isGood: false };\n}\n\nreturn { isGood: true };\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -3664,
+        -192
+      ],
+      "id": "d691e328-182c-4772-966d-812218ed2ec5",
+      "name": "isGood?"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "7b552af0-4e46-4e5d-8c05-03077c8b430b",
+              "name": "message",
+              "value": "=Category or device_type not found, or AI error, id(odoo): {{ $('get items odoo').first().json.result[0].id }}, sku: {{ $('get items odoo').first().json.result[0].default_code }}, market: CDON",
+              "type": "string"
+            },
+            {
+              "id": "1323e18f-74e7-44ff-a078-03a74e6adae9",
+              "name": "taskId",
+              "value": "={{ $('Start').first().json.taskId }}",
+              "type": "array"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -3968,
+        320
+      ],
+      "id": "e93b3268-ed3c-4053-b99a-4166bf8d9ce9",
+      "name": "Unexpected Category"
+    },
+    {
+      "parameters": {
+        "jsCode": "const article = $('Formating products').first().json.article;\nconst category = $('Get Category').first().json.id;\nconst taskId = $('Start').first().json.taskId;\nconst productId = $('Start').first().json.productId;\n\nconst updatedArticle = {\n  ...article,\n  category,\n  taskId,\n  productId\n};\n\nreturn {\n  article: updatedArticle\n};\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -3216,
+        -192
+      ],
+      "id": "0367ef2e-3f65-4189-83da-36c81f7b99ad",
+      "name": "product + category"
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "80UOeEUnhqWTuAuD",
+          "mode": "list",
+          "cachedResultUrl": "/workflow/<WORKFLOW_ID>",
+          "cachedResultName": "[Cdon] Take Categories. Subprocess"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [
+        -3856,
+        -192
+      ],
+      "id": "2ca38a92-9a0d-4af6-a15f-6cdd364ca88f",
+      "name": "Get Category"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "2df6b53b-0e94-498a-8ee1-e1de10feafe2",
+              "name": "message",
+              "value": "=Product is already listed but \"paused\", marketplace SKU: {{ $('GET Cdon Article').first().json.sku }}, cdonId: {{ $('GET Cdon Article').first().json.id }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -6112,
+        32
+      ],
+      "id": "07aa20ba-d189-49b6-835e-b0013479716a",
+      "name": "Message Product Paused"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "3aa11eb3-ca19-4ba3-9be2-0065fb6597b6",
+              "leftValue": "={{ $('Get Product Info').first().json.x_studio_cdon_id.toBoolean() }}",
+              "rightValue": 36,
+              "operator": {
+                "type": "boolean",
+                "operation": "false",
+                "singleValue": true
+              }
+            },
+            {
+              "id": "95a602db-de01-4f9a-901d-9a7e980a946e",
+              "leftValue": "={{ $('Get Product Info').first().json.x_studio_cdon_id.length }}",
+              "rightValue": 36,
+              "operator": {
+                "type": "number",
+                "operation": "notEquals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -6656,
+        -288
+      ],
+      "id": "c51d1dc4-e39f-4b19-8dc8-6c9e0dbb3263",
+      "name": "If Cdon Id"
+    },
+    {
+      "parameters": {
+        "url": "={{ $('Api CDON').first().json.baseURL }}/v1/articles/{{ $('Get Product Info').first().json.x_studio_cdon_id }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Basic {{ $('Api CDON').first().json.base64_encoded }}"
+            },
+            {
+              "name": "x-merchant-id",
+              "value": "={{ $('Api CDON').first().json.merchantID }}"
+            },
+            {
+              "name": "Accept",
+              "value": "application/json"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": true
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -6640,
+        -112
+      ],
+      "id": "2511f5ad-79e4-4386-a1cd-c36ae71760ea",
+      "name": "GET Cdon Article",
+      "alwaysOutputData": true,
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "const product_info = $('Get Product Info').first().json;\n\nconst main_img = \"https://your-instance.example.com/web/image/product.template/\" + product_info.id + \"/image_1920\";\n\nconst additional_images = product_info.product_template_image_ids.map(item => {\n  const link = \"https://your-instance.example.com/web/image/product.image/\" + item + \"/image_1920\";\n  return link\n});\n\nreturn {main_img, additional_images};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -5584,
+        -304
+      ],
+      "id": "5d71cb36-f8d0-42a9-8f95-50d12ce4d2e8",
+      "name": "Get images is_published true"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "0eb2541e-f2bc-4d61-9269-c935c9b63c57",
+              "leftValue": "={{ $('Get Product Info').first().json.is_published }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -5824,
+        -304
+      ],
+      "id": "8fb55207-48d4-457e-8472-fa9f9f68d90a",
+      "name": "is_published true"
+    },
+    {
+      "parameters": {
+        "jsCode": "return $input.all();"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -5344,
+        -192
+      ],
+      "id": "6d6e9f40-e9eb-4b1d-9294-eb19067e1eab",
+      "name": "Final URLs"
+    },
+    {
+      "parameters": {
+        "content": "# Create URL fo Images",
+        "height": 544,
+        "width": 736,
+        "color": 6
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -5936,
+        -384
+      ],
+      "typeVersion": 1,
+      "id": "945649d5-b1b7-4a73-8b8e-e3d9f8c9bb9e",
+      "name": "Sticky Note7"
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "Kemz2y75sfW4kkwu",
+          "mode": "list",
+          "cachedResultUrl": "/workflow/<WORKFLOW_ID>",
+          "cachedResultName": "Get AWS Images"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "product_id": "={{ $('Start').first().json.productId }}"
+          },
+          "matchingColumns": [
+            "product_id"
+          ],
+          "schema": [
+            {
+              "id": "product_id",
+              "displayName": "product_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "number",
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        -5808,
+        -64
+      ],
+      "id": "c8579d9a-75d8-4365-a339-6ad1c87e2d23",
+      "name": "Create Images on AWS"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "8a61d77f-f65b-4852-89bf-7571e2f18691",
+              "name": "main_img",
+              "value": "={{ $json.main_image_url }}",
+              "type": "string"
+            },
+            {
+              "id": "19c492fa-992a-41ec-a6b3-eab9768261c7",
+              "name": "additional_images",
+              "value": "={{ $json.additional_images_urls }}",
+              "type": "array"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -5584,
+        -64
+      ],
+      "id": "f0bacb97-bbd3-4191-9793-ebe86c67a7af",
+      "name": "Set URLs"
+    },
+    {
+      "parameters": {
+        "fieldToSplitOut": "taskId",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [
+        -8112,
+        80
+      ],
+      "id": "17f99b50-6074-4db3-925e-18e2fb7a0c93",
+      "name": "Split Ids"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        -7920,
+        80
+      ],
+      "id": "34b188b4-8935-40f7-b5cc-f8960e4124b0",
+      "name": "Loop Over Items1"
+    },
+    {
+      "parameters": {
+        "fieldToSplitOut": "taskId",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [
+        -6432,
+        304
+      ],
+      "id": "8d6719d6-c0ab-44dd-8be5-bf940d25c8da",
+      "name": "Split Ids1"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        -6240,
+        304
+      ],
+      "id": "5ad75be3-b28f-49b0-8a67-dc0f4bcf717b",
+      "name": "Loop Over Items2"
+    },
+    {
+      "parameters": {
+        "fieldToSplitOut": "taskId",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [
+        -3808,
+        320
+      ],
+      "id": "ffb79086-39e1-4b9f-a04b-8b936b2382e6",
+      "name": "Split Ids2"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        -3600,
+        320
+      ],
+      "id": "60daa685-7795-4229-897a-ad0b55de39dd",
+      "name": "Loop Over Items3"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "f144cc49-eaf1-4cc3-9888-6b0b379e72e9",
+              "leftValue": "={{ $json.error.status }}",
+              "rightValue": "={{ 403 }}",
+              "operator": {
+                "type": "number",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -6640,
+        32
+      ],
+      "id": "b1b0f6bf-9497-4f01-8ed2-76da496c6bae",
+      "name": "Check Error"
+    },
+    {
+      "parameters": {
+        "errorMessage": "Missing request to CDON"
+      },
+      "type": "n8n-nodes-base.stopAndError",
+      "typeVersion": 1,
+      "position": [
+        -6464,
+        32
+      ],
+      "id": "1f72f587-e0a1-46dd-a8ee-e56564d33379",
+      "name": "Stop and Error"
+    },
+    {
+      "parameters": {
+        "fieldToSplitOut": "result",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [
+        -8864,
+        -128
+      ],
+      "id": "9eed3243-0c51-4ba0-9a76-bc0efbb5abf7",
+      "name": "Get Product Info"
+    },
+    {
+      "parameters": {
+        "jsCode": "const root = $('grouped by lang').first().json;\n\nconst localesOrder = [\"da_DK\", \"sv_SE\", \"fi_FI\"];\n\nconst allowBrands = [\n  \"ICH-ZAPFE\", \"KLASEBO\", \"SKU-SHOP\", \"CELLFAST\", \"RAINBIRD\", \"KWB\", \"GREEN-SPLIT\", \"Weekiss\",\n  \"HAPPY PEOPLE\", \"DRESSELHAUS\", \"SKU-SHOP\", \"NATUREN\", \"TESA\", \"SCHUMACHER\", \"CARSYSTEM\", \"SCHUTZ\",\n  \"NICE\", \"BUHLER\", \"VOSSCHEMIE\", \"YACHTCARE\", \"Caramella\", \"Casadeco\", \"Texdecor\", \"Kidsdepot\", \"Coming Kids\",\n  \"Egmont Toys\", \"Happy Horse\", \"just dutch\", \"Le Toy Van\", \"Folkmanis\", \"Mathy by Bols\", \"Mr Maria\", \"3 Sprouts\",\n  \"Elements for Kids\", \"Bink Bedding\", \"Buokids\", \"Romina\", \"Sebra\", \"Sirch\", \"Snurk\", \"Superliving\", \"ALL CARE\",\n  \"ARTUR GLÖCKLER GmbH\", \"BETEC\", \"PROTEC Germany\", \"BEVI-CLEAN\", \"BROUWLAND\", \"CIS\", \"DMT\", \"DSI\", \"DISPTEK Group\",\n  \"FELOM\", \"Franz Matthes GmbH\", \"Thonhauser GmbH\", \"FUCHS\", \"GasTech GmbH\", \"GGV Handelsgesellschaft\", \"GLORIA GmbH\",\n  \"Iberian Coppers Lda\", \"JUNG\", \"LINDR \", \"MICRO MATIC\", \"MISA\", \"Oxyturbo\", \"ProfiGast\", \"RICK & JULICH\",\n  \"SARO Gastro-Products GmbH\", \"SCHÄFER Produkte GmbH\", \"Stölzle Lausitz GmbH\", \"TeeSA Web GmbH & Co KG\", \"UBC\",\n  \"Wecomatic\", \"HN Kernstützen Metallwaren GmbH Thüringen\", \"HBW Handel\", \"GARDEN STEEL\"\n];\n\nconst ACME = [\n  \"BRYZA\", \"ACME®\", \"Cepex\", \"Cellfast\", \"Sobime\", \"Cell Fast\",\n  \"Hase Safety Gloves GmbH\", \"Rain Bird\", \"FIXAFLEX\", \"Geli GmbH\", \"KWB\",\n  \"Beckmann&Brehm\", \"DOKAS\", \"Zill\", \"Cordes\", \"Cook King\",\n  \"nmc Deutschland GmbH\", \"NMC\", \"COYOTTO GARDEN POTS\", \"Brandenburg Späne\",\n  \"Pipetec GmbH\", \"Happy People GmbH & Co. KG\", \"BB-Verpackungen GmbH\",\n  \"CORDES GmbH & Co.KG\", \"Dresselhaus\", \"ecoon\", \"ACME Brands\",\n  \"acme\", \"BGS\", \"Rasenspecht\",\n  \"Quedlinburger Saatgut GmbH\", \"Quedlinburger\", \"Naturen\", \"Celaflor\",\n  \"Tesa\", \"Kurt Europe\", \"TFP Sp. z o.o.\", \"Schumacher PL\",\n  \"Netbox\", \"Mayer Network GmbH\", \"Substral\", \"DJUX\",\n  \"Karl Verpackungen\", \"KM\", \"Heumüller Holzwolle\", \"Kompackt61\",\n  \"RRK\", \"Kraftfixx\", \"MATADOR’S BBQ Smoking Chips\", \"Papier Kurz\",\n  \"MD Securepack\", \"Nexa\", \"PaperWise NL\", \"Induplast\",\n  \"Lincar\", \"MAALDERIJ ROOSENS\", \"Buhl Paperform\",\n  \"Garant Verlag\", \"Nuevopak GmbH\", \"4iQ Group sp. z o.o.\"\n];\n\nconst availableMarkets = [];\nlet finalBrand = null;\nlet finalBarcode = null;\n\nfor (const locale of localesOrder) {\n\n  const product = root[locale];\n\n  if (!product) {\n    return {\n      reason: \"Bad Locale\",\n      message: `Missing data for locale ${locale}`\n    };\n  }\n\n  const name = product.x_studio_name_3;\n  const description = product.x_studio_description_unique;\n  const manufacturerNameRaw =\n    product.x_studio_manufacturer_name || product.x_studio_brand_name;\n  const sku = product.default_code;\n\n  // ---------------- MARKETS ----------------\n  if (name && description) {\n    const market = locale.split('_')[1];\n    availableMarkets.push(market);\n  }\n\n  // ---------------- VALIDATION ----------------\n  if (!name) {\n    return {\n      reason: \"Bad Fields\",\n      message: `Missing title for ${locale}`\n    };\n  }\n\n  if (name.length < 10 || name.length > 85) {\n    return {\n      reason: \"Bad Fields\",\n      message: `Invalid title length for ${locale}`\n    };\n  }\n\n  if (!description) {\n    return {\n      reason: \"Bad Fields\",\n      message: `Missing description for ${locale}`\n    };\n  }\n\n  if (description.length < 10 || description.length > 5000) {\n    return {\n      reason: \"Bad Fields\",\n      message: `Invalid description length for ${locale}`\n    };\n  }\n\n  // ---------------- BARCODE ----------------\n  let barcode = \"\";\n\n  if (product.barcode?.length === 13) {\n    barcode = product.barcode;\n  } else if (product.x_studio_archive_barcode?.length === 13) {\n    barcode = product.x_studio_archive_barcode;\n  } else if (product.seo_product_gtin?.length === 13) {\n    barcode = product.seo_product_gtin;\n  } else {\n    return {\n      reason: \"No Barcode\",\n      message: \"Product barcode is missing\"\n    };\n  }\n\n  const price = product.list_price;\n  if (price == null || price === false || price <= 0) {\n    return {\n      reason: \"No Sale Price\",\n      locale,\n      message: \"Invalid product price\"\n    };\n  }\n\n  const manufacturerName = String(manufacturerNameRaw || \"\").trim();\n  if (!manufacturerName || manufacturerName === \"0\") {\n    return {\n      reason: \"Bad Fields\",\n      message: \"Brand is missing or invalid\"\n    };\n  }\n\n  // ---------------- BRAND (resolved once) ----------------\n  if (!finalBrand) {\n\n    if (sku && sku.startsWith(\"WF-\")) {\n      finalBrand = \"WESTFALIA\";\n      finalBarcode = barcode;\n      continue;\n    }\n\n    // ACME brands\n    if (ACME(b => b.toLowerCase())\n        .includes(manufacturerName.toLowerCase())) {\n      finalBrand = \"SKU-SHOP\";\n      finalBarcode = barcode;\n      continue;\n    }\n\n    // allowBrands normalisation\n    const normalizedInput = manufacturerName\n      .toLowerCase()\n      .replace(/[®©™]/g, \"\")\n      .replace(/\\s+/g, \"\")\n      .replace(/-/g, \"\");\n\n    const normalizedAllowBrands = allowBrands.map(original => ({\n      original,\n      normalized: original\n        .toLowerCase()\n        .replace(/[®©™]/g, \"\")\n        .replace(/\\s+/g, \"\")\n        .replace(/-/g, \"\")\n    }));\n\n    const matchedBrand = normalizedAllowBrands.find(b =>\n      b.normalized.includes(normalizedInput) ||\n      normalizedInput.includes(b.normalized)\n    );\n\n    if (!matchedBrand) {\n      return {\n        reason: \"Forbidden Brand\",\n        message: \"Brand is not in the allowed list\"\n      };\n    }\n\n    finalBrand = matchedBrand.original;\n    finalBarcode = barcode;\n  }\n}\n\n// ---------------- AFTER LOOP ----------------\n\nif (availableMarkets.length === 0) {\n  return {\n    reason: \"Bad Fields\",\n    message: \"No valid locale with a title and description\"\n  };\n}\n\nreturn {\n  brand: finalBrand,\n  barcode: finalBarcode,\n  markets: availableMarkets\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -8432,
+        -240
+      ],
+      "id": "5c0c160f-c858-4490-8bc2-6a15083cd0bf",
+      "name": "Checks Level #1"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "69f0c6df-0dca-4268-b56e-c935838f65e5",
+              "leftValue": "={{ $json.message }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notExists",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -8240,
+        -240
+      ],
+      "id": "8bccf8da-d924-4ce9-a42c-405082a4020c",
+      "name": "Check Errors"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "ebf70d82-cb3c-4138-bfa5-ec0f3507acef",
+              "name": "message",
+              "value": "={{ $json.message }}",
+              "type": "string"
+            },
+            {
+              "id": "cf3e6a1d-1142-464c-93aa-b081d35274c1",
+              "name": "reason",
+              "value": "={{ $json.reason }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -8448,
+        80
+      ],
+      "id": "d7dce80b-9562-42d8-b884-0de269999f67",
+      "name": "Set Message"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "7b5cd473-e927-476b-adf0-90be6c34ecce",
+              "leftValue": "={{ $json.result[0].x_studio_attachments[0] }}",
+              "rightValue": "",
+              "operator": {
+                "type": "number",
+                "operation": "exists",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -7968,
+        -256
+      ],
+      "id": "0b623fa5-4ab1-4448-8ece-7e2583aa4c2a",
+      "name": "Check attachments"
+    },
+    {
+      "parameters": {
+        "resource": "custom",
+        "customResource": "x_description_images",
+        "operation": "getAll",
+        "limit": 1,
+        "options": {
+          "fieldsList": "={{ [\"x_studio_file_filename\",\"x_studio_file_pdf\", \"x_studio_file\"] }}"
+        },
+        "filterRequest": {
+          "filter": [
+            {
+              "fieldName": "id",
+              "value": "={{ $('get product info').first().json.x_studio_attachments }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.odoo",
+      "typeVersion": 1,
+      "position": [
+        -7728,
+        -384
+      ],
+      "id": "cb90fb32-ce17-42d0-852a-77d8337e9ae4",
+      "name": "Attachments info",
+      "alwaysOutputData": true,
+      "retryOnFail": true,
+      "waitBetweenTries": 5000,
+      "credentials": {
+        "odooApi": {
+          "id": "",
+          "name": "YOUR_ODOOAPI_CREDENTIAL"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "ecfb988a-d09f-4ae3-bdb4-5c0a5dcadcb0",
+              "leftValue": "={{ $json.total_check }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -6960,
+        -240
+      ],
+      "id": "5abcd4d2-cca4-47b8-b79c-f4865c9dab81",
+      "name": "check total"
+    },
+    {
+      "parameters": {
+        "jsCode": "const product = $('Get Product Info').first().json;\n\n// Get the category name (from the previous step)\nconst categories_name = $input.first().json.categories_name;\n\n// --- Try to get the PDF file (safely) ---\nlet pdf_file = null;\nlet infoIZS = null;\ntry {\n  // Check that the node exists and has data\n  const attachmentNode = $('Attachments info').first();\n  if (attachmentNode && attachmentNode.json) {\n    pdf_file = attachmentNode.json.x_studio_file || null;\n    infoIZS = attachmentNode.json.x_studio_file_pdf || null;\n  }\n} catch (e) {\n  // If the node did not run or is missing, ignore it; pdf_file stays null\n  console.log(\"Attachments info missing or failed\");\n}\n\nconst tags = product.product_tag_ids || [];\nconst Image = product.image_1920;\n\nconst deliveryTags = [1, 2, 3, 4, 5, 6, 7, 8, 9];\nconst hasDeliveryTag = tags.some(tag => deliveryTags.includes(tag));\n\nlet output = {\n  product_tag_ids: tags,\n  categories_name: categories_name,\n  dr_free_qty: product.dr_free_qty,\n  check_delivery_tags: hasDeliveryTag,\n  check_chemistry: true,\n  check_image: Image !== false && Image != null,\n  check_stock: product.dr_free_qty > 0,\n  // eu_responsible_name: product.x_studio_eu_responsible_name,\n  // eu_responsible_phone_number: product.x_studio_eu_responsible_phone_number,\n  // eu_responsible_email: product.x_studio_eu_responsible_email,\n  // eu_responsible_country: product.x_studio_eu_responsible_country,\n  // eu_responsible_post_code: product.x_studio_eu_responsible_post_code,\n  // eu_responsible_town: product.x_studio_eu_responsible_town,\n  // eu_responsible_street: product.x_studio_eu_responsible_street,\n  // eu_responsible_house_no: product.x_studio_eu_responsible_house_no,\n  manufacturer_name: product.x_studio_manufacturer_name,\n  is_published: product.is_published,\n  x_studio_gpsr_image: product.x_studio_gpsr_image,\n  x_studio_file: pdf_file, // <-- PDF added to the output\n  infoIZS\n};\n\n// --- Delivery tags check ---\nif (!hasDeliveryTag) {\n  output.message = \"no delivery option\";\n  output.reason = \"No Delivery Tag\";\n}\n\n// --- Forbidden tags ---\nconst forbiddenTags = [241, 307];\nconst hasForbiddenTag = tags.some(tag => forbiddenTags.includes(tag));\n\nif (hasForbiddenTag) {\n  output.message = \"Product has a tag that blocks marketplace listing\";\n  output.reason = \"Not For Marketplaces\";\n}\n\n// --- Chemicals category (new logic) ---\n// If the category is Chemicals (7)\nif (product.categ_id && product.categ_id[0] === 7) {\n  // PDF exists: skip this block (product is valid)\n  // No PDF (!pdf_file): block the product\n  if (!pdf_file) {\n    output.check_chemistry = false;\n    output.message = \"Product is in the chemicals category (possible biocide): not listed (no PDF)\";\n    output.reason = \"Not For Marketplaces\";\n  }\n}\n\n// --- Main image check ---\nif (Image === false || Image == null) {\n  output.check_image = false;\n  output.message = \"Main image does not exist\";\n  output.reason = \"Bad Fields\";\n}\n\n// --- Category presence check (via categories_name) ---\nif (!categories_name || categories_name === false) {\n  output.message = \"Product has no category\";\n  output.reason = \"Bad Fields\";\n}\n\n// --- Stock check ---\nif (!output.check_stock) {\n  output.message = \"product is out of stock\";\n  output.reason = \"Stock Is Unavailable\";\n}\n\n// --- GPSR check ---\nlet gpsr_bad_fields = [];\nlet check_gpsr = true;\n\nconst gpsr_data = {\n  x_studio_eu_responsible_name: product.x_studio_eu_responsible_name,\n  x_studio_eu_responsible_phone_number: product.x_studio_eu_responsible_phone_number,\n  x_studio_eu_responsible_email: product.x_studio_eu_responsible_email,\n  x_studio_eu_responsible_country: product.x_studio_eu_responsible_country,\n  x_studio_eu_responsible_post_code: product.x_studio_eu_responsible_post_code,\n  x_studio_eu_responsible_town: product.x_studio_eu_responsible_town,\n  x_studio_eu_responsible_street: product.x_studio_eu_responsible_street,\n  x_studio_eu_responsible_house_no: product.x_studio_eu_responsible_house_no,\n  x_studio_manufacturer_name: product.x_studio_manufacturer_name,\n  x_studio_gpsr_image: product.x_studio_gpsr_image\n};\n\nfor (const [key, value] of Object.entries(gpsr_data)) {\n  if (\n    value === false ||\n    value === \"\" ||\n    value === \"0\" ||\n    value === 0 ||\n    value === \"-\" ||\n    (typeof value === \"string\" && value.toLowerCase() === \"#n/a\") || \n    (typeof value === \"string\" && value.toLowerCase() === \"n/a\")\n  ) {\n    gpsr_bad_fields.push(key); \n    check_gpsr = false;\n  }\n}\n\n\noutput.check_gpsr = check_gpsr;\n\nif (!check_gpsr) {\n  output.message = \"GPSR data is incomplete\";\n  output.reason = \"No GPSR\";\n  output.gpsr_bad_fields = gpsr_bad_fields;\n}\n\n// --- General check ---\nlet total_check = [\n  check_gpsr,\n  output.check_image,\n  output.check_chemistry, // true if Chemicals and a PDF exists\n  hasDeliveryTag,\n  categories_name && categories_name !== false,\n  output.check_stock\n].every(s => s === true);\n\nreturn [{\n  ...output,\n  gpsr_data,\n  total_check: total_check\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -7152,
+        -240
+      ],
+      "id": "97f1ff53-9996-4eaa-b5ad-7f4f3d09885c",
+      "name": "Checks Level #2"
+    },
+    {
+      "parameters": {
+        "content": "# Error Stage",
+        "height": 320,
+        "width": 1104,
+        "color": 3
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -8496,
+        16
+      ],
+      "typeVersion": 1,
+      "id": "f4be01b8-867d-409c-906e-65ebe41bc0b6",
+      "name": "Sticky Note11"
+    },
+    {
+      "parameters": {
+        "content": "# Checks levels #1 #2",
+        "height": 384,
+        "width": 1760,
+        "color": 5
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -8496,
+        -400
+      ],
+      "typeVersion": 1,
+      "id": "958f4fad-6b8c-49a7-927b-75648d9499bc",
+      "name": "Sticky Note12"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('Api Odoo').first().json.odoProdUrl }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json; charset=utf-8",
+        "body": "={\n    \"jsonrpc\": \"2.0\",\n    \"method\": \"call\",\n    \"params\": {\n        \"service\": \"object\",\n        \"method\": \"execute_kw\",\n        \"args\": [\n            \"{{ $('Api Odoo').first().json.odoo_name_sql }}\",\n            {{ $('Api Odoo').first().json.odoo_id_user_api }},\n            \"{{ $('Api Odoo').first().json.odoo_api }}\",\n            \"product.public.category\",\n            \"search_read\",\n            [ \n                [ \n                    [\"id\", \"in\", [{{ $('Get Product Info').first().json.public_categ_ids }}]]\n                ] \n            ],\n            {\n                \"fields\": [\n                    \"id\",\n                    \"name\",\n                    \"parent_id\",\n                    \"parents_and_self\"\n                ]\n            }\n        ]\n    }\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -7504,
+        -240
+      ],
+      "id": "82e3b774-0ac1-4a8a-bdae-804dc4022cf5",
+      "name": "get categories",
+      "retryOnFail": true
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "0474c211-6530-414a-b308-6686419cc7a1",
+              "name": "message",
+              "value": "={{ $json.message }}",
+              "type": "string"
+            },
+            {
+              "id": "fa34737b-55c5-4ddd-87e4-3fd8dc07e7e9",
+              "name": "reason",
+              "value": "={{ $json.reason }}",
+              "type": "string"
+            },
+            {
+              "id": "dd45f303-fd08-4b28-9b28-d6f79a17b49e",
+              "name": "id_stage",
+              "value": 4,
+              "type": "number"
+            },
+            {
+              "id": "db20613f-f8c2-41ce-8235-c141fe05297a",
+              "name": "=taskId",
+              "value": "={{ $('Start').first().json.taskId }}",
+              "type": "array"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -8272,
+        80
+      ],
+      "id": "8f274e04-4c15-4cb6-911d-bab75b25af47",
+      "name": "status to forge error"
+    },
+    {
+      "parameters": {
+        "jsCode": "let result = $input.first().json.result;\n\n// No categories array or it is empty: return false\nif (!result || !Array.isArray(result) || result.length === 0) {\n  return [{ categories_name: false }];\n}\n\n// Main logic\nlet categories_name = result\n  .map(item => ({\n    name: item.name,\n    parent_name: item.parent_id ? item.parent_id[1] : \"\",\n    prarents_and_self: item.parents_and_self,\n    length: item.parents_and_self?.length || 0\n  }))\n  .sort((a, b) => b.length - a.length)[0];\n\n// Category not found: return false\nif (!categories_name || !categories_name.name) {\n  return [{ categories_name: false }];\n}\n\n// Build the title text\nlet replace_name = result.find(f => f.parent_id === false)?.name + \" / \";\nlet final_name = categories_name.parent_name.replace(replace_name, \"\") + \" -> \" + categories_name.name;\n\n// Return the final result\nreturn [{ categories_name: final_name || false }];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -7312,
+        -240
+      ],
+      "id": "c64946e3-553a-48c4-8b5d-fa2ba947b381",
+      "name": "full categories"
+    },
+    {
+      "parameters": {
+        "resource": "custom",
+        "customResource": "res.currency",
+        "operation": "getAll",
+        "returnAll": true,
+        "options": {
+          "fieldsList": [
+            "rate",
+            "id",
+            "name"
+          ]
+        },
+        "filterRequest": {
+          "filter": [
+            {
+              "fieldName": "id",
+              "operator": "in",
+              "value": "={{ [10, 18] }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.odoo",
+      "typeVersion": 1,
+      "position": [
+        -4816,
+        -192
+      ],
+      "id": "0df17f14-568a-4df5-b855-5e252d0d1f54",
+      "name": "Get Curency Rate",
+      "executeOnce": true,
+      "credentials": {
+        "odooApi": {
+          "id": "",
+          "name": "YOUR_ODOOAPI_CREDENTIAL"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "0474c211-6530-414a-b308-6686419cc7a1",
+              "name": "message",
+              "value": "={{ $json.message }}",
+              "type": "string"
+            },
+            {
+              "id": "dd45f303-fd08-4b28-9b28-d6f79a17b49e",
+              "name": "id_stage",
+              "value": 3,
+              "type": "number"
+            },
+            {
+              "id": "db20613f-f8c2-41ce-8235-c141fe05297a",
+              "name": "=taskId",
+              "value": "={{ $('Start').first().json.taskId }}",
+              "type": "array"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -6624,
+        304
+      ],
+      "id": "56c4c6ab-7930-4703-bc4c-6f4d01a7f19a",
+      "name": "status to forge error1"
+    },
+    {
+      "parameters": {
+        "mode": "raw",
+        "jsonOutput": "={\n  \"article\": {{ $json.article }},\n  \"addValues\": {\n  \"productId\": {{ $('Start').first().json.productId }}\n  }\n}\n",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -4048,
+        -192
+      ],
+      "id": "882a4e27-fd75-40bd-a5b7-2eeb08c11da3",
+      "name": "Add Values"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "9e8827b8-b467-471b-946a-7ae17fc54a0c",
+              "name": "message",
+              "value": "Product was listed before but is no longer accessible, probably deleted or blocked: \"403. Forbidden. You do not have permission to access this object\"",
+              "type": "string"
+            },
+            {
+              "id": "044154d3-8e42-42f9-8c57-6bc7cc99a752",
+              "name": "reason",
+              "value": "Bad Fields",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -6112,
+        -224
+      ],
+      "id": "2705de38-ab34-4905-a0f9-8e32e79491a8",
+      "name": "Bad Product"
+    }
+  ],
+  "connections": {
+    "Api Odoo": {
+      "main": [
+        [
+          {
+            "node": "Api CDON",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Over Items": {
+      "main": [
+        [
+          {
+            "node": "grouped by lang",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "get items odoo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Out": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Start": {
+      "main": [
+        [
+          {
+            "node": "Api Odoo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "get items odoo": {
+      "main": [
+        [
+          {
+            "node": "Product Exist?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "grouped by lang": {
+      "main": [
+        [
+          {
+            "node": "Checks Level #1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Product Exist?": {
+      "main": [
+        [
+          {
+            "node": "Get Product Info",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "No Product",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "CDON Basic Settings": {
+      "main": [
+        [
+          {
+            "node": "Split Out",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Api CDON": {
+      "main": [
+        [
+          {
+            "node": "CDON Basic Settings",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "send message": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "send active stage": {
+      "main": [
+        [
+          {
+            "node": "send message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "send message problem1": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "send Unexpected Category stage": {
+      "main": [
+        [
+          {
+            "node": "send message problem1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "send message problem3": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "send error stage": {
+      "main": [
+        [
+          {
+            "node": "send message problem3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Price": {
+      "main": [
+        [
+          {
+            "node": "get properties",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Switch": {
+      "main": [
+        [
+          {
+            "node": "is_published true",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Message Product Active",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Message Product Paused",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Bad Product",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Message Product Active": {
+      "main": [
+        [
+          {
+            "node": "status to forge error1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Formating products": {
+      "main": [
+        [
+          {
+            "node": "Add Values",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "get properties": {
+      "main": [
+        [
+          {
+            "node": "Get Curency Rate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "properties to array and check weee": {
+      "main": [
+        [
+          {
+            "node": "Get Material",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Material": {
+      "main": [
+        [
+          {
+            "node": "Formating products",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "No Product": {
+      "main": [
+        [
+          {
+            "node": "Set Message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "isGood?1": {
+      "main": [
+        [
+          {
+            "node": "product + category",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Unexpected Category",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "isGood?": {
+      "main": [
+        [
+          {
+            "node": "isGood?1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Unexpected Category": {
+      "main": [
+        [
+          {
+            "node": "Split Ids2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Category": {
+      "main": [
+        [
+          {
+            "node": "isGood?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "product + category": {
+      "main": [
+        []
+      ]
+    },
+    "Message Product Paused": {
+      "main": [
+        [
+          {
+            "node": "status to forge error1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If Cdon Id": {
+      "main": [
+        [
+          {
+            "node": "is_published true",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "GET Cdon Article",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GET Cdon Article": {
+      "main": [
+        [
+          {
+            "node": "Switch",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Check Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "is_published true": {
+      "main": [
+        [
+          {
+            "node": "Get images is_published true",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Create Images on AWS",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get images is_published true": {
+      "main": [
+        [
+          {
+            "node": "Final URLs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Final URLs": {
+      "main": [
+        [
+          {
+            "node": "Get Price",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Images on AWS": {
+      "main": [
+        [
+          {
+            "node": "Set URLs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set URLs": {
+      "main": [
+        [
+          {
+            "node": "Final URLs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Ids": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Over Items1": {
+      "main": [
+        [],
+        [
+          {
+            "node": "send error stage",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Ids1": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Over Items2": {
+      "main": [
+        [],
+        [
+          {
+            "node": "send active stage",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Ids2": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Over Items3": {
+      "main": [
+        [],
+        [
+          {
+            "node": "send Unexpected Category stage",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Error": {
+      "main": [
+        [
+          {
+            "node": "Switch",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Stop and Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Product Info": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Checks Level #1": {
+      "main": [
+        [
+          {
+            "node": "Check Errors",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Errors": {
+      "main": [
+        [
+          {
+            "node": "Check attachments",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Set Message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set Message": {
+      "main": [
+        [
+          {
+            "node": "status to forge error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check attachments": {
+      "main": [
+        [
+          {
+            "node": "Attachments info",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "get categories",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Attachments info": {
+      "main": [
+        [
+          {
+            "node": "get categories",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "check total": {
+      "main": [
+        [
+          {
+            "node": "If Cdon Id",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Set Message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Checks Level #2": {
+      "main": [
+        [
+          {
+            "node": "check total",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "get categories": {
+      "main": [
+        [
+          {
+            "node": "full categories",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "status to forge error": {
+      "main": [
+        [
+          {
+            "node": "Split Ids",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "full categories": {
+      "main": [
+        [
+          {
+            "node": "Checks Level #2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Curency Rate": {
+      "main": [
+        [
+          {
+            "node": "properties to array and check weee",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "status to forge error1": {
+      "main": [
+        [
+          {
+            "node": "Split Ids1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Add Values": {
+      "main": [
+        [
+          {
+            "node": "Get Category",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Bad Product": {
+      "main": [
+        [
+          {
+            "node": "Set Message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": false
+  }
+}

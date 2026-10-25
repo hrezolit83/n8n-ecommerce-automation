@@ -16,7 +16,7 @@ All credentials, company names, hosts and IDs are removed. Workflows are importa
 | 08 | Lost Orders Monitoring (all marketplaces) | 22 | Health checks per channel, alert deduplication |
 | 09 | Product Listing via XML API (Hood.de) | 61 | XML request building/parsing, pagination, taxes, images |
 | 10 | AI Category Selection with Fallback | 20 | Two-step LLM (OpenAI + Grok), Google Sheets manual fallback |
-| 11 | Multi-language Listing with Compliance Filter | 77 | PT/ES content, forbidden-words filter, offer status checks |
+| 11 | Multi-language Listing: Odoo → CDON (Nordic) | 59 | Main orchestrator + sub-workflows, per-locale validation (DK/SE/FI), GPSR and chemicals checks, currency conversion, stage routing |
 | 12 | Pending → Active Offer Activation | 51 | Offer import, status polling, stage updates in Odoo |
 
 ---
@@ -103,9 +103,18 @@ All credentials, company names, hosts and IDs are removed. Workflows are importa
 
 Two-step LLM classification (main category, then subcategory) with structured output. If the model is not confident, the workflow takes the category from a Google Sheet that a manager maintains, so the process never stops.
 
-## Case 11 — Multi-language listing with compliance filter
+## Case 11 — Multi-language listing on a Nordic marketplace
 
-Builds Portuguese and Spanish product content from Odoo, replaces words forbidden by marketplace rules, checks if an offer already exists and whether it is active, and routes every product to the right Odoo stage: Pending, Active, Error or Unexpected Category.
+**Problem.** Products had to be listed on a Nordic marketplace in several languages (DK/SE/FI) with its own API, prices in local currencies and strict content and safety rules.
+
+**Solution.** Listing is split into several connected workflows. This is the main one: it receives one product at a time, collects all data and calls sub-workflows for categories, attributes and images. It:
+1. Checks whether the product already exists on the marketplace and in which status (active, paused, inaccessible).
+2. Collects product data for every locale from Odoo and validates each one: title and description length, barcode, price, brand allow-list.
+3. Runs compliance checks: GPSR data, main image, stock, delivery tags, and blocks chemical products without a safety PDF.
+4. Converts prices to local currencies and builds the article payload with images.
+5. Sends the product to the marketplace and moves the Odoo task to the right stage with a readable reason.
+
+**Result.** Products are listed in all Nordic locales automatically; every rejection has a clear reason in Odoo.
 
 ## Case 12 — Pending → Active activation
 
