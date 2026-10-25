@@ -6,7 +6,7 @@ All credentials, company names, hosts and IDs are removed. Workflows are importa
 
 | # | Workflow | Nodes | Key techniques |
 |---|---|---|---|
-| 01 | AI Product Listing: Odoo → Marketplace | 90 | LLM agents, structured output, HMAC-signed API, pagination, image pipeline |
+| 01 | Marketplace Autoposting (main): Odoo → Marketplace | 89 | Orchestrator + sub-workflows, attribute matching, image pipeline, compliance filter, stage routing |
 | 02 | Marketplace Orders → Odoo Sales Orders | 56 | OAuth2, pagination, customer deduplication, sub-workflows |
 | 03 | Stock & Price Sync: Odoo → Mirakl | 31 | Batch loops, diff-only updates, multi-channel pricing, rate-limit waits |
 | 04 | Tracking Numbers Sync + Alerts | 42 | Shipment aggregation, carrier validation, Bitrix24 error tasks |
@@ -21,18 +21,19 @@ All credentials, company names, hosts and IDs are removed. Workflows are importa
 
 ---
 
-## Case 1 — AI-powered product listing on a new marketplace
+## Case 1 — Main autoposting pipeline: Odoo → marketplace listing
 
-**Problem.** Each marketplace has its own category tree and required attributes. Listing hundreds of products by hand took days, and every product was rejected for a different reason.
+**Problem.** Each marketplace has its own category tree, required attributes and content rules. Listing hundreds of products by hand took days, and every product was rejected for a different reason.
 
-**Solution.** A workflow that takes a product from an Odoo task queue and:
-1. Validates mandatory fields (barcode, price, GPSR, brand, delivery tag) and routes failures to clear error reasons back in Odoo.
-2. Uses an LLM agent with structured output to pick the right marketplace category and attribute set from the API.
-3. Pulls the full attribute schema (with pagination) and lets the LLM fill required attributes using only allowed values.
-4. Builds the image set, signs the request (HMAC-SHA512) and imports the product with its offer.
-5. Handles duplicate / invalid-field / API errors separately and updates the task stage.
+**Solution.** The main workflow orchestrates the whole listing process. It takes a product from the Odoo task queue and:
+1. Checks whether the product is already listed and whether its offer is LIVE, so nothing is posted twice.
+2. Loads product data, properties, material and prices from Odoo and groups content per language.
+3. Calls sub-workflows for category selection and required-attribute matching, routing unexpected categories and unresolved attributes to their own Odoo stages.
+4. Replaces words forbidden by marketplace rules and builds the image set through an image-upload sub-workflow.
+5. Imports the product with its offer, polls the import status in batches and runs two levels of error checks.
+6. Moves the Odoo task to Pending, Active, Error or Unexpected Category with a readable reason.
 
-**Result.** Listing became fully automatic: products move from "New task" to "Pending" without manual work; every rejection has a readable reason.
+**Result.** Listing became fully automatic: products move from "New task" to "Pending"/"Active" without manual work; every rejection has a readable reason.
 
 ## Case 2 — Marketplace orders into the ERP
 
