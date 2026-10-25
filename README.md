@@ -6,17 +6,17 @@ All credentials, company names, hosts and IDs are removed. Workflows are importa
 
 | # | Workflow | Nodes | Key techniques |
 |---|---|---|---|
-| 01 | Marketplace Autoposting (main): Odoo → Marketplace | 89 | Orchestrator + sub-workflows, attribute matching, image pipeline, compliance filter, stage routing |
-| 02 | Marketplace Orders → Odoo Sales Orders | 56 | OAuth2, pagination, customer deduplication, sub-workflows |
+| 01 | Marketplace Autoposting (main): Odoo → Marketplace | 76 | Orchestrator + sub-workflows, attribute matching, image pipeline, compliance filter, stage routing |
+| 02 | Marketplace Orders → Odoo Sales Orders | 35 | Customer deduplication, SKU matching, order total check, sale order via JSON-RPC |
 | 03 | Stock & Price Sync: Odoo → Mirakl | 31 | Batch loops, diff-only updates, multi-channel pricing, rate-limit waits |
 | 04 | Tracking Numbers Sync + Alerts | 42 | Shipment aggregation, carrier validation, Bitrix24 error tasks |
 | 05 | AI Category Mapper | 19 | LLM classification against a category tree, structured output parser |
 | 06 | AI Required Attributes Filler | 18 | LLM + marketplace value lists, strict prompt rules, fallbacks |
 | 07 | Auto-Reconciliation: Bank Payments ↔ Odoo Invoices | 29 | Odoo accounting API, matching logic, Bitrix24 checklist |
 | 08 | Lost Orders Monitoring (all marketplaces) | 22 | Health checks per channel, alert deduplication |
-| 09 | Product Listing via XML API (Hood.de) | 65 | XML request building/parsing, pagination, taxes, images |
+| 09 | Product Listing via XML API (Hood.de) | 61 | XML request building/parsing, pagination, taxes, images |
 | 10 | AI Category Selection with Fallback | 20 | Two-step LLM (OpenAI + Grok), Google Sheets manual fallback |
-| 11 | Multi-language Listing with Compliance Filter | 91 | PT/ES content, forbidden-words filter, offer status checks |
+| 11 | Multi-language Listing with Compliance Filter | 77 | PT/ES content, forbidden-words filter, offer status checks |
 | 12 | Pending → Active Offer Activation | 51 | Offer import, status polling, stage updates in Odoo |
 
 ---
@@ -37,11 +37,16 @@ All credentials, company names, hosts and IDs are removed. Workflows are importa
 
 ## Case 2 — Marketplace orders into the ERP
 
-**Problem.** Orders from several marketplaces had to be entered into Odoo manually, including customers and addresses.
+**Problem.** Orders from a Nordic marketplace (DK/SE/FI) had to be entered into Odoo manually, including customers, addresses and prices.
 
-**Solution.** A scheduled workflow fetches new orders (OAuth2 token, paginated API), checks if the order already exists, finds or creates the buyer and delivery contacts without duplicates, maps products by SKU and creates a sales order. Errors stop the order and are logged instead of creating broken records.
+**Solution.** Every 30 minutes the workflow fetches new orders and, for each one:
+1. Skips orders that already exist in Odoo (by source order number).
+2. Finds the country and the right pricelist, then searches for the customer by email or phone, address and name; creates a new contact only if no exact match exists.
+3. Matches order lines to Odoo products by SKU or legacy ID, and checks that the sum of lines equals the order total before creating anything.
+4. Creates and confirms the sales order on the right website. (The invoice steps at the end are disconnected: invoicing was later moved to Odoo's own automatic invoicing settings.)
+5. Stops with a clear error if products are missing or totals do not match, instead of creating broken records.
 
-**Result.** Orders appear in Odoo automatically several times a day; no duplicate customers.
+**Result.** Orders appear in Odoo automatically, without duplicate customers or wrong totals.
 
 ## Case 3 — Stock & price sync across 4 country channels
 
@@ -99,7 +104,7 @@ Builds Portuguese and Spanish product content from Odoo, replaces words forbidde
 
 ## Case 12 — Pending → Active activation
 
-For products that became LIVE on the marketplace, the workflow creates offers in bulk, polls the import status until it is complete and moves the Odoo tasks to Active. Later this logic was rewritten as a Python service, cutting the run time from ~4 hours to 6 seconds.
+For products that became LIVE on the marketplace, the workflow creates offers in bulk, polls the import status until it is complete and moves the Odoo tasks to Active.
 
 ---
 
